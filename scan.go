@@ -14,8 +14,10 @@ func init() {
 }
 
 var (
-	errScanStructValue = errors.New("orm: value must be non-nil pointer to a struct")
-	errScanSliceValue  = errors.New("orm: value must be non-nil pointer to a slice")
+	errScanPtr          = errors.New("brows: value must bu non-nil pointer")
+	errScanStructValue  = errors.New("brows: value must be non-nil pointer to a struct")
+	errScanSliceValue   = errors.New("brows: value must be non-nil pointer to a slice")
+	errScanSliceElement = errors.New("brows: the element of slice must be a struct")
 )
 
 // field
@@ -159,7 +161,7 @@ func ScanSlice(rows *sql.Rows, dest interface{}) error {
 
 	log.Printf("d.Elem kind:%v, type:%v", de.Kind(), de.Type())
 
-	if de.Kind() != reflect.Slice { // 必须是数组
+	if de.Kind() != reflect.Slice { // 必须是切片
 		return errScanSliceValue
 	}
 
@@ -168,11 +170,8 @@ func ScanSlice(rows *sql.Rows, dest interface{}) error {
 
 	// 切片数据类型检查
 	if deType.Kind() != reflect.Struct { // 必须是结构体
-		return errScanStructValue
+		return errScanSliceElement
 	}
-
-	// ddd := reflect.New(t)
-	// log.Printf("t.Kind:%v, ddd.kind:%v", t.Kind(), ddd.Elem().Type())
 
 	// 标签
 	fieldTagMap := compileStructTag(deType)
