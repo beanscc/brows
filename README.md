@@ -1,2 +1,2 @@
 # brows
-将mysql sql.Rows 处理并赋值给结构体
+将 mysql *sql.Rows 解析至目标结构体
