@@ -4,45 +4,52 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"reflect"
 	"strings"
 )
 
 var (
-	errScanPtr         = errors.New("brows: value must be non-nil pointer")
-	errScanStructValue = errors.New("brows: value must be non-nil pointer to a struct")
-	errScanSliceValue  = errors.New("brows: value must be non-nil pointer to a slice")
+	errScanPtr      = errors.New("brows: value must be non-nil pointer")
+	errScanPtrSlice = errors.New("brows: value must be non-nil pointer to a slice")
 )
 
 // ScanSlice 将多个返回结果值赋值给 dest 数组，对应 query
-// dest 必须是 []T or []*T 的指针类型
+// dest 必须是 []T or []*T 的指针类型, T 只能是 struct or 基本数据类型
 func ScanSlice(rows *sql.Rows, dest interface{}) error {
 	// close rows
 	defer rows.Close()
 
-	// dest 类型检查
-	dv := reflect.ValueOf(dest)
-	log.Printf("dest kind: %v", dv.Kind())
-
-	if dv.Kind() != reflect.Ptr || dv.IsNil() { // 必须是指针
-		return errScanStructValue
+	value := reflect.ValueOf(dest)
+	if value.Kind() != reflect.Ptr || value.IsNil() {
+		return errScanPtr
 	}
 
-	// 获取指针指向的元素
-	dve := dv.Elem() // slice
-	log.Printf("d.Elem kind:%v, type:%v", dve.Kind(), dve.Type())
-	if dve.Kind() != reflect.Slice { // 必须是切片
-		return errScanSliceValue
+	// must slice
+	slice := value.Elem()
+	if slice.Kind() != reflect.Slice {
+		return errScanPtrSlice
 	}
 
-	dveElem := dve.Type().Elem() // slice element
-	log.Printf("deType.Kind:%v", dveElem.Kind())
+	sliceElemType := slice.Type().Elem() // slice element
+	sliceElemInnerType := sliceElemType
+	if reflect.Ptr == sliceElemType.Kind() {
+		sliceElemInnerType = sliceElemInnerType.Elem()
+	}
 
-	// // 切片数据类型检查
-	// if dveElem.Kind() != reflect.Struct { // 必须是结构体
-	// 	return errScanSliceElement
-	// }
+	// sliceElem 只支持
+	isItemStruct := false
+	switch sliceElemInnerType.Kind() {
+	case reflect.Struct:
+		isItemStruct = true
+	case reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64,
+		reflect.Interface,
+		reflect.String:
+	default:
+		return errors.New("unsupported slice elem type")
+	}
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -50,38 +57,27 @@ func ScanSlice(rows *sql.Rows, dest interface{}) error {
 	}
 
 	for rows.Next() {
-		typeOne := dveElem
-		if reflect.Ptr == dveElem.Kind() {
-			// []*T
-			typeOne = typeOne.Elem()
+		one := reflect.New(sliceElemInnerType)
+		var args []any
+		if isItemStruct {
+			args = buildScanArgs(columns, one)
+		} else {
+			args = []any{one.Interface()}
 		}
 
-		one := reflect.New(typeOne)
-		args := buildScanArgs(columns, one)
 		if err := rows.Scan(args...); err != nil {
 			return err
 		}
-		log.Printf("typeOne type:%s", typeOne.Kind())
-		if reflect.Ptr != dveElem.Kind() { // 非指针
+		if reflect.Ptr != sliceElemType.Kind() {
 			one = one.Elem()
 		}
-		dve = reflect.Append(dve, one)
+		slice = reflect.Append(slice, one)
 	}
-
-	// // debug
-	// for i := 0; i < dve.Len(); i++ {
-	// 	log.Printf("dve: i:%2d, v:%#v", i, dve.Index(i))
-	// }
-
-	dv.Elem().Set(dve)
-
-	// log.Printf("dest Type:%#v", dest) // dest 指针对象
-
 	if err := rows.Err(); err != nil {
-		// log.Printf("rows.err. err: %v", err)
 		return err
 	}
 
+	value.Elem().Set(slice)
 	return nil
 }
 
@@ -110,7 +106,6 @@ func Scan(rows *sql.Rows, dest any) error {
 
 		// 映射查询字段和结构体字段
 		args := buildScanArgs(columns, e)
-		// log.Printf("args:%#v", args)
 		if err := rows.Scan(args...); err != nil {
 			return err
 		}
@@ -129,13 +124,13 @@ func buildScanArgs(columns []string, e reflect.Value) []any {
 	}
 
 	tagMap := mapping(e)
-	// debug
-	for k, v := range tagMap {
-		log.Printf("buildScanArgs mapping k:%s, v:%#v", k, v)
-	}
+	// // debug
+	// for k, v := range tagMap {
+	// 	log.Printf("buildScanArgs mapping k:%s, v:%#v", k, v)
+	// }
 
 	out := make([]any, 0, len(columns))
-	for i, v := range columns {
+	for _, v := range columns {
 		f, ok := tagMap[v]
 		if !ok {
 			// 忽略这个字段的 scan
@@ -143,16 +138,16 @@ func buildScanArgs(columns []string, e reflect.Value) []any {
 			continue
 		}
 
-		log.Printf("index:%2d, v:%s, f:%#v, e:%#v", i, v, f, e)
+		// log.Printf("index:%2d, v:%s, f:%#v, e:%#v", i, v, f, e)
 
 		fv := e.FieldByIndex(f.index)
 		out = append(out, fv.Addr().Interface())
 	}
 
-	// debug
-	for i, v := range out {
-		log.Printf("buildScanArgs out idx:%2d, v:%#v", i, v)
-	}
+	// // debug
+	// for i, v := range out {
+	// 	log.Printf("buildScanArgs out idx:%2d, v:%#v", i, v)
+	// }
 
 	return out
 }
@@ -177,7 +172,7 @@ type structFiledIndex struct {
 }
 
 func mapping(value reflect.Value) map[string]structFiledIndex {
-	log.Printf("mapping|vaule:%#v", value)
+	// log.Printf("mapping|vaule:%#v", value)
 
 	vt := value.Type()
 
@@ -187,7 +182,7 @@ func mapping(value reflect.Value) map[string]structFiledIndex {
 		for i := 0; i < value.NumField(); i++ {
 			field := vt.Field(i)
 			fieldValue := value.Field(i)
-			log.Printf("mapping|field i:%2d, v:%#v, type:%v, kind:%s", i, field, field.Type, field.Type.Kind())
+			// log.Printf("mapping|field i:%2d, v:%#v, type:%v, kind:%s", i, field, field.Type, field.Type.Kind())
 			switch {
 			case !field.IsExported():
 				// 不可导出

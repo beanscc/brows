@@ -196,10 +196,9 @@ func TestBrows_QueryRow(t *testing.T) {
 		},
 	}
 
-	b := brows.New(db)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := b.QueryRow(tt.args.dest, tt.args.query, tt.args.args...)
+			err := brows.QueryRow(db, tt.args.dest, tt.args.query, tt.args.args...)
 			if err != nil && !tt.want.hasErr {
 				t.Errorf("QueryRow failed. err: %v", err)
 				return
@@ -230,18 +229,18 @@ func TestBrows_Query(t *testing.T) {
 		args args
 		want want
 	}{
-		// {
-		// 	name: "t1",
-		// 	args: args{
-		// 		// dest:  &[]App{},
-		// 		dest:  &[]*App{},
-		// 		query: `select id, name, app_id, secret, sign, start_time, end_time, status, ctime, utime, operator from app`,
-		// 		args:  nil,
-		// 	},
-		// 	want: want{
-		// 		hasErr: false,
-		// 	},
-		// },
+		{
+			name: "t1",
+			args: args{
+				// dest:  &[]App{},
+				dest:  &[]*App{},
+				query: `select id, name, app_id, secret, sign, start_time, end_time, status, ctime, utime, operator from app`,
+				args:  nil,
+			},
+			want: want{
+				hasErr: false,
+			},
+		},
 		// {
 		// 	name: "t2",
 		// 	args: args{
@@ -264,16 +263,15 @@ func TestBrows_Query(t *testing.T) {
 				args:  []interface{}{0},
 			},
 			want: want{
-				hasErr:  true,
+				hasErr:  false,
 				errNote: "dest 必须是切片, 且切片的元素必须是个结构体",
 			},
 		},
 	}
 
-	b := brows.New(db)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := b.Query(tt.args.dest, tt.args.query, tt.args.args...)
+			err := brows.Query(db, tt.args.dest, tt.args.query, tt.args.args...)
 			if err != nil && !tt.want.hasErr {
 				t.Errorf("QueryRow failed. err: %v", err)
 				return
