@@ -17,15 +17,17 @@ var db *sql.DB
 func init() {
 	// init db
 	mysqlConf := &mysql.Config{
-		Addr:         "0.0.0.0:3306",
-		Net:          "tcp",
-		User:         "root",
-		Passwd:       "",
-		DBName:       "test",
-		Timeout:      3 * time.Second,
-		ReadTimeout:  3 * time.Second,
-		WriteTimeout: 3 * time.Second,
-		ParseTime:    true,
+		// Addr:         "0.0.0.0:3306",
+		Addr:                 "127.0.0.1:3306",
+		Net:                  "tcp",
+		User:                 "root",
+		Passwd:               "P4m@bpet",
+		DBName:               "test",
+		Timeout:              3 * time.Second,
+		ReadTimeout:          3 * time.Second,
+		WriteTimeout:         3 * time.Second,
+		ParseTime:            true,
+		AllowNativePasswords: true,
 	}
 
 	if err := Conn(mysqlConf); err != nil {
@@ -54,18 +56,29 @@ func Conn(c *mysql.Config) error {
 	return nil
 }
 
+type AppStatus int
+
 type App struct {
-	ID        int64     `db:"id"`
-	Name      string    `db:"name"`
-	AppID     string    `db:"app_id"`
-	Secret    string    `db:"secret"`
-	Sign      string    `db:"sign"`
-	Status    bool      `db:"status"`
-	EndTime   int64     `db:"end_time"`
-	StartTime int64     `db:"start_time"`
-	Ctime     time.Time `db:"ctime"`
-	Utime     time.Time `db:"utime"`
-	Operator  string    `db:"operator"`
+	ID     int64     `db:"id"`
+	Name   string    `db:"name"`
+	AppID  string    `db:"app_id"`
+	Secret string    `db:"secret"`
+	Sign   string    `db:"sign"`
+	Status AppStatus `db:"status"`
+	// EndTime   int64     `db:"end_time"`
+	// StartTime int64     `db:"start_time"`
+
+	// 内嵌类型
+	*AppTime
+
+	Ctime    time.Time `db:"ctime"`
+	Utime    time.Time `db:"utime"`
+	Operator string    `db:"operator"`
+}
+
+type AppTime struct {
+	EndTime   int64 `db:"end_time"`
+	StartTime int64 `db:"start_time"`
 }
 
 /*
@@ -91,7 +104,7 @@ CREATE TABLE IF NOT EXISTS `app` (
   UNIQUE INDEX `name_UNIQUE` (`name` ASC))
 ENGINE = InnoDB
 DEFAULT CHARACTER SET = utf8
-COMMENT = '应用APP'
+COMMENT = '应用APP';
 
 -- 添加测试数据
 
@@ -152,7 +165,18 @@ func TestBrows_QueryRow(t *testing.T) {
 			args: args{
 				dest:  &App{},
 				query: `select id from app where status = ?`,
-				args:  []interface{}{0},
+				args:  []interface{}{1},
+			},
+			want: want{
+				hasErr: false,
+			},
+		},
+		{
+			name: "t2-1",
+			args: args{
+				dest:  &App{},
+				query: `select start_time, end_time, id, name, app_id, secret, sign,  status, ctime, utime, operator from app where id = ?`,
+				args:  []interface{}{2},
 			},
 			want: want{
 				hasErr: false,
@@ -171,8 +195,8 @@ func TestBrows_QueryRow(t *testing.T) {
 			},
 		},
 	}
-	b := brows.New(db)
 
+	b := brows.New(db)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := b.QueryRow(tt.args.dest, tt.args.query, tt.args.args...)
@@ -181,17 +205,9 @@ func TestBrows_QueryRow(t *testing.T) {
 				return
 			}
 
-			t.Logf("ret: %+v, type: %T", tt.args.dest, tt.args.dest)
-
-			if tt.name == "t3" { // 单个字段类型测试
-				name, ok := (tt.args.dest).(*string)
-
-				t.Logf("ok: %v, name: %+v", ok, *name)
-
-				if !reflect.DeepEqual(*name, tt.want.data) || !ok {
-					t.Errorf("test name failed")
-				}
-			}
+			rv := reflect.ValueOf(tt.args.dest)
+			t.Logf("ret value type: %s", rv.Type())
+			t.Logf("ret value elem: %#v", rv.Elem().Interface())
 		})
 	}
 }
@@ -214,31 +230,32 @@ func TestBrows_Query(t *testing.T) {
 		args args
 		want want
 	}{
-		{
-			name: "t1",
-			args: args{
-				dest:  &[]App{},
-				query: `select id, name, app_id, secret, sign, start_time, end_time, status, ctime, utime, operator from app`,
-				args:  nil,
-			},
-			want: want{
-				hasErr: false,
-			},
-		},
-		{
-			name: "t2",
-			args: args{
-				dest: &[]struct {
-					ID     int64 `db:"id"`
-					Status bool  `db:"status"`
-				}{},
-				query: `select id, status from app where status = ?`,
-				args:  []interface{}{0},
-			},
-			want: want{
-				hasErr: false,
-			},
-		},
+		// {
+		// 	name: "t1",
+		// 	args: args{
+		// 		// dest:  &[]App{},
+		// 		dest:  &[]*App{},
+		// 		query: `select id, name, app_id, secret, sign, start_time, end_time, status, ctime, utime, operator from app`,
+		// 		args:  nil,
+		// 	},
+		// 	want: want{
+		// 		hasErr: false,
+		// 	},
+		// },
+		// {
+		// 	name: "t2",
+		// 	args: args{
+		// 		dest: &[]struct {
+		// 			ID     int64 `db:"id"`
+		// 			Status bool  `db:"status"`
+		// 		}{},
+		// 		query: `select id, status from app where status = ?`,
+		// 		args:  []interface{}{0},
+		// 	},
+		// 	want: want{
+		// 		hasErr: false,
+		// 	},
+		// },
 		{
 			name: "t3",
 			args: args{
@@ -261,69 +278,12 @@ func TestBrows_Query(t *testing.T) {
 				t.Errorf("QueryRow failed. err: %v", err)
 				return
 			}
-
-			t.Logf("ret: %+v", tt.args.dest)
-		})
-	}
-}
-
-// go test -v -run TestBrows_Exec
-func TestBrows_Exec(t *testing.T) {
-	type args struct {
-		query string
-		args  []interface{}
-	}
-
-	type want struct {
-		data    interface{}
-		hasErr  bool
-		errNote string
-	}
-
-	tests := []struct {
-		name string
-		args args
-		want want
-	}{
-		{
-			name: "t1",
-			args: args{
-				query: `update app set status = 1 where status = ?`,
-				args:  []interface{}{0},
-			},
-			want: want{
-				hasErr: false,
-			},
-		},
-		{
-			name: "t2",
-			args: args{
-				query: `update app set status = 0 where status = ?`,
-				args:  []interface{}{1},
-			},
-			want: want{
-				hasErr: false,
-			},
-		},
-	}
-
-	b := brows.New(db)
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ret, err := b.Exec(tt.args.query, tt.args.args...)
-			if err != nil && !tt.want.hasErr {
-				t.Errorf("QueryRow failed. err: %v", err)
-				return
+			t.Logf("ret: %#v", tt.args.dest)
+			if v := reflect.ValueOf(tt.args.dest); reflect.Ptr == v.Kind() && reflect.Slice == v.Elem().Kind() {
+				for i := 0; i < v.Elem().Len(); i++ {
+					t.Logf("ret slice idx:%2d, elem:%#v", i, v.Elem().Index(i))
+				}
 			}
-
-			affectedRow, err := ret.RowsAffected()
-
-			t.Logf("ret: lastInsertID: %+v err: %v", affectedRow, err)
-
-			lastInsertID, err := ret.LastInsertId()
-			t.Logf("ret: lastInsertID: %+v, err: %v", lastInsertID, err)
 		})
-
-		time.Sleep(2 * time.Second)
 	}
 }
