@@ -13,6 +13,47 @@ var (
 	errScanPtrSlice = errors.New("brows: value must be non-nil pointer to a slice")
 )
 
+// Scan scan one row
+// desc must be pointer
+func Scan(rows *sql.Rows, dest any) error {
+	// 关于scan 部分，保持和 sql.Row Scan() 方法同步
+	defer rows.Close()
+	if _, ok := dest.(*sql.RawBytes); ok {
+		return errors.New("brows: RawBytes isn't allowed on Scan")
+	}
+
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		return sql.ErrNoRows
+	}
+
+	v := reflect.ValueOf(dest)
+	if v.Kind() != reflect.Ptr || v.IsNil() {
+		return errScanPtr
+	}
+
+	if e := v.Elem(); e.Kind() == reflect.Struct {
+		columns, err := rows.Columns()
+		if err != nil {
+			return err
+		}
+
+		// 映射查询字段和结构体字段
+		args := buildScanArgs(columns, e)
+		if err := rows.Scan(args...); err != nil {
+			return err
+		}
+	} else {
+		if err := rows.Scan(dest); err != nil {
+			return err
+		}
+	}
+
+	return rows.Close()
+}
+
 // ScanSlice 将多个返回结果值赋值给 dest 数组，对应 query
 // dest 必须是 []T or []*T 的指针类型, T 只能是 struct or 基本数据类型
 func ScanSlice(rows *sql.Rows, dest interface{}) error {
@@ -78,44 +119,7 @@ func ScanSlice(rows *sql.Rows, dest interface{}) error {
 	}
 
 	value.Elem().Set(slice)
-	return nil
-}
-
-// Scan scan one row
-// desc must be pointer
-func Scan(rows *sql.Rows, dest any) error {
-	defer rows.Close()
-
-	v := reflect.ValueOf(dest)
-	if v.Kind() != reflect.Ptr || v.IsNil() {
-		return errScanPtr
-	}
-
-	if !rows.Next() {
-		if err := rows.Err(); err != nil {
-			return err
-		}
-		return sql.ErrNoRows
-	}
-
-	if e := v.Elem(); e.Kind() == reflect.Struct {
-		columns, err := rows.Columns()
-		if err != nil {
-			return err
-		}
-
-		// 映射查询字段和结构体字段
-		args := buildScanArgs(columns, e)
-		if err := rows.Scan(args...); err != nil {
-			return err
-		}
-	} else {
-		if err := rows.Scan(dest); err != nil {
-			return err
-		}
-	}
-
-	return rows.Err()
+	return rows.Close()
 }
 
 func buildScanArgs(columns []string, e reflect.Value) []any {
