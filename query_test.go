@@ -232,7 +232,17 @@ func TestBrows_Query(t *testing.T) {
 		{
 			name: "t1",
 			args: args{
-				// dest:  &[]App{},
+				dest:  &[]App{},
+				query: `select id, name, app_id, secret, sign, start_time, end_time, status, ctime, utime, operator from app`,
+				args:  nil,
+			},
+			want: want{
+				hasErr: false,
+			},
+		},
+		{
+			name: "t1.1",
+			args: args{
 				dest:  &[]*App{},
 				query: `select id, name, app_id, secret, sign, start_time, end_time, status, ctime, utime, operator from app`,
 				args:  nil,
@@ -241,20 +251,20 @@ func TestBrows_Query(t *testing.T) {
 				hasErr: false,
 			},
 		},
-		// {
-		// 	name: "t2",
-		// 	args: args{
-		// 		dest: &[]struct {
-		// 			ID     int64 `db:"id"`
-		// 			Status bool  `db:"status"`
-		// 		}{},
-		// 		query: `select id, status from app where status = ?`,
-		// 		args:  []interface{}{0},
-		// 	},
-		// 	want: want{
-		// 		hasErr: false,
-		// 	},
-		// },
+		{
+			name: "t2",
+			args: args{
+				dest: &[]struct {
+					ID     int64 `db:"id"`
+					Status bool  `db:"status"`
+				}{},
+				query: `select id, status from app where status = ?`,
+				args:  []interface{}{0},
+			},
+			want: want{
+				hasErr: false,
+			},
+		},
 		{
 			name: "t3",
 			args: args{
@@ -263,8 +273,18 @@ func TestBrows_Query(t *testing.T) {
 				args:  []interface{}{0},
 			},
 			want: want{
-				hasErr:  false,
-				errNote: "dest 必须是切片, 且切片的元素必须是个结构体",
+				hasErr: false,
+			},
+		},
+		{
+			name: "t3.1",
+			args: args{
+				dest:  &[]*int64{},
+				query: `select id from app where status = ?`,
+				args:  []interface{}{0},
+			},
+			want: want{
+				hasErr: false,
 			},
 		},
 	}

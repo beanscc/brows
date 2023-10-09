@@ -37,7 +37,7 @@ type AppTime struct {
 	StartTime int64 `db:"start_time"`
 }
 
-func Test_buildScanArgs(t *testing.T) {
+func Test_mapColumns(t *testing.T) {
 	columns := []string{
 		"id",
 		"name",
@@ -54,10 +54,10 @@ func Test_buildScanArgs(t *testing.T) {
 
 	dest := &App{}
 	e := reflect.ValueOf(dest)
-	got := buildScanArgs(columns, e)
+	got := mapColumns(columns, e)
 	i := 0
 	for k, v := range got {
-		t.Logf("Test_buildScanArgs idx:%2d, k:%v, field:%#v", i, k, v)
+		t.Logf("Test_mapColumns idx:%2d, k:%v, field:%#v", i, k, v)
 		i++
 	}
 }

@@ -41,7 +41,7 @@ func Scan(rows *sql.Rows, dest any) error {
 		}
 
 		// 映射查询字段和结构体字段
-		args := buildScanArgs(columns, e)
+		args := mapColumns(columns, e)
 		if err := rows.Scan(args...); err != nil {
 			return err
 		}
@@ -56,6 +56,19 @@ func Scan(rows *sql.Rows, dest any) error {
 
 // ScanSlice 将多个返回结果值赋值给 dest 数组，对应 query
 // dest 必须是 []T or []*T 的指针类型, T 只能是 struct or 基本数据类型
+// example:
+//
+//		type User struct {
+//				 Name string `db:"name"`
+//				 Age uint8 `db:"age"`
+//			}
+//
+//			 var users []User
+//			 ScanSlice(rows, &users)
+//	 或
+//
+// var users []*User
+// ScanSlice(rows, &users)
 func ScanSlice(rows *sql.Rows, dest interface{}) error {
 	// close rows
 	defer rows.Close()
@@ -101,7 +114,7 @@ func ScanSlice(rows *sql.Rows, dest interface{}) error {
 		one := reflect.New(sliceElemInnerType)
 		var args []any
 		if isItemStruct {
-			args = buildScanArgs(columns, one)
+			args = mapColumns(columns, one)
 		} else {
 			args = []any{one.Interface()}
 		}
@@ -122,36 +135,30 @@ func ScanSlice(rows *sql.Rows, dest interface{}) error {
 	return rows.Close()
 }
 
-func buildScanArgs(columns []string, e reflect.Value) []any {
+// mapColumns 根据 columns 字段名称，在 e 中按 tag 找到对应 structField,
+func mapColumns(columns []string, e reflect.Value) []any {
 	if reflect.Ptr == e.Kind() {
 		e = e.Elem()
 	}
 
-	tagMap := mapping(e)
-	// // debug
-	// for k, v := range tagMap {
-	// 	log.Printf("buildScanArgs mapping k:%s, v:%#v", k, v)
-	// }
-
+	m := mapping(e, _tagLabel)
 	out := make([]any, 0, len(columns))
 	for _, v := range columns {
-		f, ok := tagMap[v]
+		f, ok := m[v]
 		if !ok {
 			// 忽略这个字段的 scan
 			out = append(out, _ignoreScan)
 			continue
 		}
 
-		// log.Printf("index:%2d, v:%s, f:%#v, e:%#v", i, v, f, e)
-
 		fv := e.FieldByIndex(f.index)
 		out = append(out, fv.Addr().Interface())
 	}
 
-	// // debug
-	// for i, v := range out {
-	// 	log.Printf("buildScanArgs out idx:%2d, v:%#v", i, v)
-	// }
+	// check
+	if len(columns) != len(out) {
+		panic("brows: columns not all matched")
+	}
 
 	return out
 }
@@ -175,29 +182,32 @@ type structFiledIndex struct {
 	field reflect.StructField
 }
 
-func mapping(value reflect.Value) map[string]structFiledIndex {
-	// log.Printf("mapping|vaule:%#v", value)
+func mapping(value reflect.Value, tag string) map[string]structFiledIndex {
+	vKind := value.Kind()
+	if reflect.Ptr == vKind {
+		if value.IsNil() {
+			value.Set(reflect.New(value.Type().Elem()))
+		}
+		return mapping(value.Elem(), tag)
+	}
 
-	vt := value.Type()
-
+	vType := value.Type()
 	out := make(map[string]structFiledIndex)
-	// struct
-	if reflect.Struct == value.Kind() {
+	if reflect.Struct == vKind {
 		for i := 0; i < value.NumField(); i++ {
-			field := vt.Field(i)
+			field := vType.Field(i)
 			fieldValue := value.Field(i)
-			// log.Printf("mapping|field i:%2d, v:%#v, type:%v, kind:%s", i, field, field.Type, field.Type.Kind())
 			switch {
 			case !field.IsExported():
 				// 不可导出
 				continue
 			case field.Anonymous:
 				// 内嵌
-				mappingMerge(out, field.Index, mapping(fieldValue))
+				mappingMerge(out, field.Index, mapping(fieldValue, tag))
 				continue
 			case reflect.Struct == field.Type.Kind():
 				if "time.Time" != field.Type.String() {
-					mappingMerge(out, field.Index, mapping(fieldValue))
+					mappingMerge(out, field.Index, mapping(fieldValue, tag))
 					continue
 				}
 			case reflect.Ptr == field.Type.Kind():
@@ -205,57 +215,58 @@ func mapping(value reflect.Value) map[string]structFiledIndex {
 					// init
 					value.Field(i).Set(reflect.New(fieldValue.Type().Elem()))
 				}
-				mappingMerge(out, field.Index, mapping(fieldValue))
+				mappingMerge(out, field.Index, mapping(fieldValue, tag))
 				continue
 			}
 
-			tag, ok := field.Tag.Lookup(_tagLabel)
-			if !ok || "" == tag {
+			tagValue := field.Tag.Get(tag)
+			tagValue, _ = head(tagValue, ",")
+			if "-" == tagValue {
 				continue
 			}
 
-			tags := strings.Split(tag, ",")
-			// tag name
-			tagName := tags[0]
-			if "-" == tagName || "" == tagName {
+			if tagValue == "" {
+				// default FieldName
+				tagValue = field.Name
+			}
+			if tagValue == "" {
 				continue
 			}
 
-			// tag 冲突检查
-			_, ok = out[tagName]
-			if ok {
-				panic(fmt.Sprintf("brows: tag[%s] conflict", tagName))
-			}
+			mappingConflict(out, tagValue, field.Name)
 
-			out[tagName] = structFiledIndex{
+			out[tagValue] = structFiledIndex{
 				index: []int{i},
 				field: field,
 			}
 		}
 	}
 
-	if reflect.Ptr == value.Kind() {
-		if value.IsNil() {
-			// init
-			value.Set(reflect.New(value.Type().Elem()))
-		}
-		return mapping(value.Elem())
-	}
-
 	return out
+}
+
+// mappingConflict tag 冲突检查
+func mappingConflict(m map[string]structFiledIndex, tag string, field string) {
+	if v, ok := m[tag]; ok {
+		panic(fmt.Sprintf("brows: tag[%s] conflict. field %s vs %s", tag, v.field.Name, field))
+	}
 }
 
 // mappingMerge 合并
 func mappingMerge(dest map[string]structFiledIndex, parentIndex []int, source map[string]structFiledIndex) {
 	for k, v := range source {
-		// tag 冲突检查
-		if dv, ok := dest[k]; ok {
-			panic(fmt.Sprintf("brows: tag[%s] conflicted. in fields:%s",
-				k, strings.Join([]string{dv.field.Name, v.field.Name}, "")))
-		}
+		mappingConflict(dest, k, v.field.Name)
 		dest[k] = structFiledIndex{
 			index: append(parentIndex, v.index...),
 			field: v.field,
 		}
 	}
+}
+
+func head(str, sep string) (head string, tail string) {
+	idx := strings.Index(str, sep)
+	if idx < 0 {
+		return str, ""
+	}
+	return str[:idx], str[idx+len(sep):]
 }
