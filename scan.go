@@ -175,6 +175,18 @@ type structFiledIndex struct {
 	field reflect.StructField
 }
 
+// mapping 提取 value 对象的 tag 和 structField 的映射关系
+//
+// 提取规则
+// - tag 需唯一，value 对象内，若 tag 重复，则 panic
+// - structField 是以下情况的，将被忽略
+//   - 不可导
+//   - tag 是 '-' 或 空
+//
+// - structField 是以下情况的，将遍历 field 对象的内部字段
+//   - 匿名内嵌对象
+//   - 非 time.Time 类型的结构体
+//   - 指针对象
 func mapping(value reflect.Value, tag string) map[string]structFiledIndex {
 	vKind := value.Kind()
 	if reflect.Ptr == vKind {
@@ -214,15 +226,7 @@ func mapping(value reflect.Value, tag string) map[string]structFiledIndex {
 
 			tagValue := field.Tag.Get(tag)
 			tagValue, _ = head(tagValue, ",")
-			if "-" == tagValue {
-				continue
-			}
-
-			if tagValue == "" {
-				// default FieldName
-				tagValue = field.Name
-			}
-			if tagValue == "" {
+			if "-" == tagValue || "" == tagValue {
 				continue
 			}
 
