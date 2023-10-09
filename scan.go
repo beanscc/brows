@@ -13,8 +13,19 @@ var (
 	errScanPtrSlice = errors.New("brows: value must be non-nil pointer to a slice")
 )
 
-// Scan scan row
-// desc must be *struct
+// Scan 读取第一行记录，复制到 dest 指向的结构体
+// 结构体字段通过 tag 和 columns 进行唯一匹配，不依赖 columns 和结构体字段顺序
+// 若 Rows 有多条记录，只读取第一条，丢弃其他剩余记录
+// 若 Rows 无记录，则返回 sql.ErrNoRows 错误
+// example:
+//
+//	type User struct {
+//		Name string `db:"name"`
+//		Age uint8 `db:"age"`
+//	}
+//
+//	var user User
+//	Scan(rows, &user)
 func Scan(rows *sql.Rows, dest any) error {
 	defer rows.Close()
 
@@ -58,10 +69,9 @@ func Scan(rows *sql.Rows, dest any) error {
 //		Age uint8 `db:"age"`
 //	}
 //
-// var users []User
-// // or var users []*User
-// ScanSlice(rows, &users)
-func ScanSlice(rows *sql.Rows, dest interface{}) error {
+//	var users []User // or []*User
+//	ScanSlice(rows, &users)
+func ScanSlice(rows *sql.Rows, dest any) error {
 	// close rows
 	defer rows.Close()
 

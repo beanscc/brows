@@ -1,23 +1,16 @@
-package brows_test
+package brows
 
 import (
 	"database/sql"
-	"fmt"
-	"log"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/beanscc/brows"
 	"github.com/go-sql-driver/mysql"
 )
 
-var db *sql.DB
-
-func init() {
-	// init db
-	mysqlConf := &mysql.Config{
-		// Addr:         "0.0.0.0:3306",
+func testDB(t *testing.T) *sql.DB {
+	conf := &mysql.Config{
 		Addr:                 "127.0.0.1:3306",
 		Net:                  "tcp",
 		User:                 "root",
@@ -30,53 +23,39 @@ func init() {
 		AllowNativePasswords: true,
 	}
 
-	if err := Conn(mysqlConf); err != nil {
+	dsn := conf.FormatDSN()
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
 		panic(err)
 	}
 
-	// set log
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+	if err := db.Ping(); err != nil {
+		panic(err)
+	}
+	return db
 }
 
-// Conn 根据配置连接 mysql
-func Conn(c *mysql.Config) error {
-	dsn := c.FormatDSN()
-	fmt.Printf("\n\ndsn: %v\n\n", dsn)
-	mysqlDB, err := sql.Open("mysql", dsn)
-	if err != nil {
-		return err
-	}
+type TestAppStatus int
 
-	if err := mysqlDB.Ping(); err != nil {
-		return err
-	}
-
-	db = mysqlDB
-
-	return nil
-}
-
-type AppStatus int
-
-type App struct {
-	ID     int64     `db:"id"`
-	Name   string    `db:"name"`
-	AppID  string    `db:"app_id"`
-	Secret string    `db:"secret"`
-	Sign   string    `db:"sign"`
-	Status AppStatus `db:"status"`
+type TestApp struct {
+	ID     int64         `db:"id"`
+	Name   string        `db:"name"`
+	AppID  string        `db:"app_id"`
+	Secret string        `db:"secret"`
+	Sign   string        `db:"sign"`
+	Status TestAppStatus `db:"status"`
 	// EndTime   int64     `db:"end_time"`
 	// StartTime int64     `db:"start_time"`
 
 	// 内嵌类型
-	*AppTime
+	*TestAppTime
 
 	Ctime    time.Time `db:"ctime"`
 	Utime    time.Time `db:"utime"`
 	Operator string    `db:"operator"`
 }
 
-type AppTime struct {
+type TestAppTime struct {
 	EndTime   int64 `db:"end_time"`
 	StartTime int64 `db:"start_time"`
 }
@@ -151,7 +130,7 @@ func TestQueryRow(t *testing.T) {
 		{
 			name: "t1",
 			args: args{
-				dest:  &App{},
+				dest:  &TestApp{},
 				query: `select id, name, app_id, secret, sign, start_time, end_time, status, ctime, utime, operator from app`,
 				args:  nil,
 			},
@@ -162,7 +141,7 @@ func TestQueryRow(t *testing.T) {
 		{
 			name: "t2",
 			args: args{
-				dest:  &App{},
+				dest:  &TestApp{},
 				query: `select id from app where status = ?`,
 				args:  []interface{}{1},
 			},
@@ -173,7 +152,7 @@ func TestQueryRow(t *testing.T) {
 		{
 			name: "t2-1",
 			args: args{
-				dest:  &App{},
+				dest:  &TestApp{},
 				query: `select start_time, end_time, id, name, app_id, secret, sign,  status, ctime, utime, operator from app where id = ?`,
 				args:  []interface{}{2},
 			},
@@ -197,7 +176,7 @@ func TestQueryRow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := brows.QueryRow(db, tt.args.dest, tt.args.query, tt.args.args...)
+			err := QueryRow(testDB(t), tt.args.dest, tt.args.query, tt.args.args...)
 			if err != nil && !tt.want.hasErr {
 				t.Errorf("QueryRow failed. err: %v", err)
 				return
@@ -231,7 +210,7 @@ func TestQuery(t *testing.T) {
 		{
 			name: "t1",
 			args: args{
-				dest:  &[]App{},
+				dest:  &[]TestApp{},
 				query: `select id, name, app_id, secret, sign, start_time, end_time, status, ctime, utime, operator from app`,
 				args:  nil,
 			},
@@ -242,7 +221,7 @@ func TestQuery(t *testing.T) {
 		{
 			name: "t1.1",
 			args: args{
-				dest:  &[]*App{},
+				dest:  &[]*TestApp{},
 				query: `select id, name, app_id, secret, sign, start_time, end_time, status, ctime, utime, operator from app`,
 				args:  nil,
 			},
@@ -290,7 +269,7 @@ func TestQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := brows.Query(db, tt.args.dest, tt.args.query, tt.args.args...)
+			err := Query(testDB(t), tt.args.dest, tt.args.query, tt.args.args...)
 			if err != nil && !tt.want.hasErr {
 				t.Errorf("QueryRow failed. err: %v", err)
 				return
