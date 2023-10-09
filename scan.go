@@ -9,18 +9,14 @@ import (
 )
 
 var (
-	errScanPtr      = errors.New("brows: value must be non-nil pointer")
+	errScanPtr      = errors.New("brows: value must be non-nil pointer to a struct")
 	errScanPtrSlice = errors.New("brows: value must be non-nil pointer to a slice")
 )
 
-// Scan scan one row
-// desc must be pointer
+// Scan scan row
+// desc must be *struct
 func Scan(rows *sql.Rows, dest any) error {
-	// 关于scan 部分，保持和 sql.Row Scan() 方法同步
 	defer rows.Close()
-	if _, ok := dest.(*sql.RawBytes); ok {
-		return errors.New("brows: RawBytes isn't allowed on Scan")
-	}
 
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
@@ -34,21 +30,20 @@ func Scan(rows *sql.Rows, dest any) error {
 		return errScanPtr
 	}
 
-	if e := v.Elem(); e.Kind() == reflect.Struct {
-		columns, err := rows.Columns()
-		if err != nil {
-			return err
-		}
+	e := v.Elem()
+	if e.Kind() != reflect.Struct {
+		return errScanPtr
+	}
 
-		// 映射查询字段和结构体字段
-		args := mapColumns(columns, e)
-		if err := rows.Scan(args...); err != nil {
-			return err
-		}
-	} else {
-		if err := rows.Scan(dest); err != nil {
-			return err
-		}
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+
+	// 映射查询字段和结构体字段
+	args := mapColumns(columns, e)
+	if err := rows.Scan(args...); err != nil {
+		return err
 	}
 
 	return rows.Close()

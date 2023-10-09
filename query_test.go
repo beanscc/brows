@@ -123,11 +123,9 @@ VALUES
 ('t1', "app_id_1_dfsdfsdfsdfsddf", "secret_1_sfsdfsdfsdfsd", "sign_1_dsfsdfvsdghadfg", 14811110152, 1523772288, 0, "app_id_1_desc", "yx"),
 ('t2', "app_id_2_dfsdfsdfsdfsddf", "secret_2_sfsdfsdfsdfsd", "sign_2_dsfsdfvsdghadfg", 1482220152, 1523772288, 1, "app_id_2_desc", "yx"),
 ('t3', "app_id_3_dfsdfsdfsdfsddf", "secret_3_sfsdfsdfsdfsd", "sign_4_dsfsdfvsdghadfg", 1483330152, 1523772288, 0, "app_id_3_desc", "yx");
-
-
 */
 
-func TestBrows_QueryRow(t *testing.T) {
+func TestQueryRow(t *testing.T) {
 	type args struct {
 		dest  interface{}
 		query string
@@ -135,8 +133,9 @@ func TestBrows_QueryRow(t *testing.T) {
 	}
 
 	type want struct {
-		data   interface{}
-		hasErr bool
+		data    interface{}
+		hasErr  bool
+		errNote string
 	}
 
 	var (
@@ -190,8 +189,8 @@ func TestBrows_QueryRow(t *testing.T) {
 				args:  []interface{}{3},
 			},
 			want: want{
-				data:   "t3",
-				hasErr: false,
+				hasErr:  true,
+				errNote: "dest must be non-nil pointer to a struct",
 			},
 		},
 	}
@@ -211,7 +210,7 @@ func TestBrows_QueryRow(t *testing.T) {
 	}
 }
 
-func TestBrows_Query(t *testing.T) {
+func TestQuery(t *testing.T) {
 	type args struct {
 		dest  interface{}
 		query string
