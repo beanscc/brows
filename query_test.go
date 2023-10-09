@@ -272,7 +272,7 @@ func TestQuery(t *testing.T) {
 				args:  []interface{}{0},
 			},
 			want: want{
-				hasErr: false,
+				hasErr: true,
 			},
 		},
 		{
@@ -283,7 +283,7 @@ func TestQuery(t *testing.T) {
 				args:  []interface{}{0},
 			},
 			want: want{
-				hasErr: false,
+				hasErr: true,
 			},
 		},
 	}

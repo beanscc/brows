@@ -50,19 +50,16 @@ func Scan(rows *sql.Rows, dest any) error {
 }
 
 // ScanSlice 将多个返回结果值赋值给 dest 数组，对应 query
-// dest 必须是 []T or []*T 的指针类型, T 只能是 struct or 基本数据类型
+// dest 必须是 []T or []*T 的指针类型
 // example:
 //
-//		type User struct {
-//				 Name string `db:"name"`
-//				 Age uint8 `db:"age"`
-//			}
+//	type User struct {
+//		Name string `db:"name"`
+//		Age uint8 `db:"age"`
+//	}
 //
-//			 var users []User
-//			 ScanSlice(rows, &users)
-//	 或
-//
-// var users []*User
+// var users []User
+// // or var users []*User
 // ScanSlice(rows, &users)
 func ScanSlice(rows *sql.Rows, dest interface{}) error {
 	// close rows
@@ -81,23 +78,15 @@ func ScanSlice(rows *sql.Rows, dest interface{}) error {
 
 	sliceElemType := slice.Type().Elem() // slice element
 	sliceElemInnerType := sliceElemType
-	if reflect.Ptr == sliceElemType.Kind() {
+	switch sliceElemType.Kind() {
+	case reflect.Ptr:
 		sliceElemInnerType = sliceElemInnerType.Elem()
-	}
-
-	// sliceElem 只支持
-	isItemStruct := false
-	switch sliceElemInnerType.Kind() {
+		if sliceElemInnerType.Kind() != reflect.Struct {
+			return errScanPtrSlice
+		}
 	case reflect.Struct:
-		isItemStruct = true
-	case reflect.Bool,
-		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-		reflect.Float32, reflect.Float64,
-		reflect.Interface,
-		reflect.String:
 	default:
-		return errors.New("unsupported slice elem type")
+		return errScanPtrSlice
 	}
 
 	columns, err := rows.Columns()
@@ -107,13 +96,7 @@ func ScanSlice(rows *sql.Rows, dest interface{}) error {
 
 	for rows.Next() {
 		one := reflect.New(sliceElemInnerType)
-		var args []any
-		if isItemStruct {
-			args = mapColumns(columns, one)
-		} else {
-			args = []any{one.Interface()}
-		}
-
+		args := mapColumns(columns, one)
 		if err := rows.Scan(args...); err != nil {
 			return err
 		}
