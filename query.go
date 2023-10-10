@@ -5,12 +5,21 @@ import (
 	"database/sql"
 )
 
-type Brows struct {
-	db *sql.DB
+type Query interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
 
-func New(db *sql.DB) *Brows {
-	return &Brows{db: db}
+type Brows struct {
+	query Query
+}
+
+// New return new Brows
+//
+// query could be *sql.DB, *sql.Tx, *sql.Conn or other object who implemented Query interface
+func New(query Query) *Brows {
+	return &Brows{
+		query: query,
+	}
 }
 
 func (b *Brows) QueryRow(query string, args ...any) *Row {
@@ -18,7 +27,7 @@ func (b *Brows) QueryRow(query string, args ...any) *Row {
 }
 
 func (b *Brows) QueryRowContext(ctx context.Context, query string, args ...any) *Row {
-	rows, err := b.db.QueryContext(ctx, query, args...)
+	rows, err := b.query.QueryContext(ctx, query, args...)
 	return &Row{err: err, rows: rows}
 }
 
@@ -43,7 +52,7 @@ func (b *Brows) Query(query string, args ...any) *Rows {
 }
 
 func (b *Brows) QueryContext(ctx context.Context, query string, args ...any) *Rows {
-	rows, err := b.db.QueryContext(ctx, query, args...)
+	rows, err := b.query.QueryContext(ctx, query, args...)
 	return &Rows{err: err, rows: rows}
 }
 
