@@ -13,12 +13,14 @@ var (
 	errScanPtrSlice = errors.New("brows: value must be non-nil pointer to a slice")
 )
 
-// Scan 读取第一行记录，复制到 dest: *struct
-// 结构体字段通过 tag 和 columns 进行唯一匹配，不依赖 columns 和结构体字段顺序
+// Scan 读取第一行记录，复制到 dest. dest 必须是 *struct.
+//
+// 结构体字段通过 tag 和 columns 进行唯一匹配，不依赖 columns 和结构体字段顺序.
 // 内部转换复制依赖 `database/sql` 包的 Rows.Scan 方法
 //
-// 若 Rows 有多条记录，只读取第一条，丢弃其他剩余记录
-// 若 Rows 无记录，则返回 sql.ErrNoRows 错误
+//   - 若 Rows 有多条记录，只读取第一条，丢弃其他剩余记录;
+//   - 若 Rows 无记录，则返回 sql.ErrNoRows 错误;
+//
 // example:
 //
 //	type User struct {
@@ -62,9 +64,10 @@ func Scan(rows *sql.Rows, dest any) error {
 	return rows.Close()
 }
 
-// ScanSlice 读取所有行记录，复制到 dest
+// ScanSlice 读取所有行记录，复制到 dest.
 // dest 必须是 []struct or []*struct 的指针
-// 结构体字段通过 tag 和 columns 进行唯一匹配，不依赖 columns 和结构体字段顺序
+//
+// 结构体字段通过 tag 和 columns 进行唯一匹配，不依赖 columns 和结构体字段顺序.
 // 内部转换复制依赖 `database/sql` 包的 Rows.Scan 方法
 //
 // example:
@@ -77,7 +80,6 @@ func Scan(rows *sql.Rows, dest any) error {
 //	var users []User // or []*User
 //	ScanSlice(rows, &users)
 func ScanSlice(rows *sql.Rows, dest any) error {
-	// close rows
 	defer rows.Close()
 
 	value := reflect.ValueOf(dest)

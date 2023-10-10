@@ -104,7 +104,7 @@ VALUES
 ('t3', "app_id_3_dfsdfsdfsdfsddf", "secret_3_sfsdfsdfsdfsd", "sign_4_dsfsdfvsdghadfg", 1483330152, 1523772288, 0, "app_id_3_desc", "yx");
 */
 
-func TestQueryRow(t *testing.T) {
+func TestBrows_QueryRow(t *testing.T) {
 	type args struct {
 		dest  interface{}
 		query string
@@ -176,7 +176,7 @@ func TestQueryRow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := QueryRow(testDB(t), tt.args.dest, tt.args.query, tt.args.args...)
+			err := New(testDB(t)).QueryRow(tt.args.query, tt.args.args...).Scan(tt.args.dest)
 			if err != nil && !tt.want.hasErr {
 				t.Errorf("QueryRow failed. err: %v", err)
 				return
@@ -189,7 +189,7 @@ func TestQueryRow(t *testing.T) {
 	}
 }
 
-func TestQuery(t *testing.T) {
+func TestBrows_Query(t *testing.T) {
 	type args struct {
 		dest  interface{}
 		query string
@@ -269,7 +269,7 @@ func TestQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := Query(testDB(t), tt.args.dest, tt.args.query, tt.args.args...)
+			err := New(testDB(t)).Query(tt.args.query, tt.args.args...).Scan(tt.args.dest)
 			if err != nil && !tt.want.hasErr {
 				t.Errorf("QueryRow failed. err: %v", err)
 				return
