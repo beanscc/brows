@@ -31,6 +31,15 @@ func (b *Brows) QueryRowContext(ctx context.Context, query string, args ...any) 
 	return &Row{err: err, rows: rows}
 }
 
+func (b *Brows) Query(query string, args ...any) *Rows {
+	return b.QueryContext(context.Background(), query, args...)
+}
+
+func (b *Brows) QueryContext(ctx context.Context, query string, args ...any) *Rows {
+	rows, err := b.query.QueryContext(ctx, query, args...)
+	return &Rows{err: err, rows: rows}
+}
+
 type Row struct {
 	err  error
 	rows *sql.Rows
@@ -45,15 +54,6 @@ func (r *Row) Scan(dest any) error {
 		return r.err
 	}
 	return Scan(r.rows, dest)
-}
-
-func (b *Brows) Query(query string, args ...any) *Rows {
-	return b.QueryContext(context.Background(), query, args...)
-}
-
-func (b *Brows) QueryContext(ctx context.Context, query string, args ...any) *Rows {
-	rows, err := b.query.QueryContext(ctx, query, args...)
-	return &Rows{err: err, rows: rows}
 }
 
 type Rows struct {
