@@ -41,12 +41,12 @@ func Scan(rows *sql.Rows, dest any) error {
 	}
 
 	v := reflect.ValueOf(dest)
-	if v.Kind() != reflect.Ptr || v.IsNil() {
+	if reflect.Ptr != v.Kind() || v.IsNil() {
 		return errScanPtr
 	}
 
 	e := v.Elem()
-	if e.Kind() != reflect.Struct {
+	if reflect.Struct != e.Kind() {
 		return errScanPtr
 	}
 
@@ -83,13 +83,13 @@ func ScanSlice(rows *sql.Rows, dest any) error {
 	defer rows.Close()
 
 	value := reflect.ValueOf(dest)
-	if value.Kind() != reflect.Ptr || value.IsNil() {
+	if reflect.Ptr != value.Kind() || value.IsNil() {
 		return errScanPtr
 	}
 
 	// must slice
 	slice := value.Elem()
-	if slice.Kind() != reflect.Slice {
+	if reflect.Slice != slice.Kind() {
 		return errScanPtrSlice
 	}
 
@@ -98,7 +98,7 @@ func ScanSlice(rows *sql.Rows, dest any) error {
 	switch sliceElemType.Kind() {
 	case reflect.Ptr:
 		sliceElemInnerType = sliceElemInnerType.Elem()
-		if sliceElemInnerType.Kind() != reflect.Struct {
+		if reflect.Struct != sliceElemInnerType.Kind() {
 			return errScanPtrSlice
 		}
 	case reflect.Struct:
@@ -148,11 +148,6 @@ func mapColumns(columns []string, e reflect.Value) []any {
 
 		fv := e.FieldByIndex(f.index)
 		out = append(out, fv.Addr().Interface())
-	}
-
-	// check
-	if len(columns) != len(out) {
-		panic("brows: columns not all matched")
 	}
 
 	return out
