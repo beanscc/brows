@@ -3,9 +3,35 @@ package brows
 import (
 	"reflect"
 	"testing"
+	"time"
 )
 
 func Test_mapColumns(t *testing.T) {
+	type testAppStatus int
+
+	type testAppTime struct {
+		EndTime   int64 `db:"end_time"`
+		StartTime int64 `db:"start_time"`
+	}
+
+	type testApp struct {
+		ID     int64         `db:"id"`
+		Name   string        `db:"name"`
+		AppID  string        `db:"app_id"`
+		Secret string        `db:"secret"`
+		Sign   string        `db:"sign"`
+		Status testAppStatus `db:"status"`
+		// EndTime   int64     `db:"end_time"`
+		// StartTime int64     `db:"start_time"`
+
+		// 内嵌类型
+		*testAppTime
+
+		Ctime    time.Time `db:"ctime"`
+		Utime    time.Time `db:"utime"`
+		Operator string    `db:"operator"`
+	}
+
 	columns := []string{
 		"id",
 		"name",
@@ -20,7 +46,7 @@ func Test_mapColumns(t *testing.T) {
 		"operator",
 	}
 
-	dest := &TestApp{}
+	dest := &testApp{}
 	e := reflect.ValueOf(dest)
 	got := mapColumns(columns, e)
 	i := 0

@@ -40,13 +40,13 @@ func Scan(rows *sql.Rows, dest any) error {
 		return sql.ErrNoRows
 	}
 
-	v := reflect.ValueOf(dest)
-	if reflect.Ptr != v.Kind() || v.IsNil() {
+	rv := reflect.ValueOf(dest)
+	if reflect.Pointer != rv.Kind() || rv.IsNil() {
 		return errScanPtr
 	}
 
-	e := v.Elem()
-	if reflect.Struct != e.Kind() {
+	ev := rv.Elem()
+	if reflect.Struct != ev.Kind() {
 		return errScanPtr
 	}
 
@@ -56,7 +56,7 @@ func Scan(rows *sql.Rows, dest any) error {
 	}
 
 	// 映射查询字段和结构体字段
-	args := mapColumns(columns, e)
+	args := mapColumns(columns, ev)
 	if err := rows.Scan(args...); err != nil {
 		return err
 	}
@@ -82,13 +82,13 @@ func Scan(rows *sql.Rows, dest any) error {
 func ScanSlice(rows *sql.Rows, dest any) error {
 	defer rows.Close()
 
-	value := reflect.ValueOf(dest)
-	if reflect.Ptr != value.Kind() || value.IsNil() {
+	rv := reflect.ValueOf(dest)
+	if reflect.Pointer != rv.Kind() || rv.IsNil() {
 		return errScanPtr
 	}
 
 	// must slice
-	slice := value.Elem()
+	slice := rv.Elem()
 	if reflect.Slice != slice.Kind() {
 		return errScanPtrSlice
 	}
@@ -96,7 +96,7 @@ func ScanSlice(rows *sql.Rows, dest any) error {
 	sliceElemType := slice.Type().Elem() // slice element
 	sliceElemInnerType := sliceElemType
 	switch sliceElemType.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		sliceElemInnerType = sliceElemInnerType.Elem()
 		if reflect.Struct != sliceElemInnerType.Kind() {
 			return errScanPtrSlice
@@ -117,7 +117,7 @@ func ScanSlice(rows *sql.Rows, dest any) error {
 		if err := rows.Scan(args...); err != nil {
 			return err
 		}
-		if reflect.Ptr != sliceElemType.Kind() {
+		if reflect.Pointer != sliceElemType.Kind() {
 			one = one.Elem()
 		}
 		slice = reflect.Append(slice, one)
@@ -126,13 +126,13 @@ func ScanSlice(rows *sql.Rows, dest any) error {
 		return err
 	}
 
-	value.Elem().Set(slice)
+	rv.Elem().Set(slice)
 	return rows.Close()
 }
 
 // mapColumns 根据 columns 字段名称，在 e 中按 tag 找到对应 structField,
 func mapColumns(columns []string, e reflect.Value) []any {
-	if reflect.Ptr == e.Kind() {
+	if reflect.Pointer == e.Kind() {
 		e = e.Elem()
 	}
 
@@ -186,7 +186,7 @@ type structFiledIndex struct {
 //   - 指针对象
 func mapping(value reflect.Value, tag string) map[string]structFiledIndex {
 	vKind := value.Kind()
-	if reflect.Ptr == vKind {
+	if reflect.Pointer == vKind {
 		if value.IsNil() {
 			value.Set(reflect.New(value.Type().Elem()))
 		}
@@ -212,7 +212,7 @@ func mapping(value reflect.Value, tag string) map[string]structFiledIndex {
 					mappingMerge(out, field.Index, mapping(fieldValue, tag))
 					continue
 				}
-			case reflect.Ptr == field.Type.Kind():
+			case reflect.Pointer == field.Type.Kind():
 				if fieldValue.IsNil() {
 					// init
 					value.Field(i).Set(reflect.New(fieldValue.Type().Elem()))
