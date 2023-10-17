@@ -194,45 +194,46 @@ func mapping(value reflect.Value, tag string) map[string]structFiledIndex {
 	}
 
 	vType := value.Type()
+	if reflect.Struct != vKind {
+		return nil
+	}
+
 	out := make(map[string]structFiledIndex)
-	if reflect.Struct == vKind {
-		for i := 0; i < value.NumField(); i++ {
-			field := vType.Field(i)
-			fieldValue := value.Field(i)
-			switch {
-			case !field.IsExported():
-				// 不可导出
-				continue
-			case field.Anonymous:
-				// 内嵌
-				mappingMerge(out, field.Index, mapping(fieldValue, tag))
-				continue
-			case reflect.Struct == field.Type.Kind():
-				if "time.Time" != field.Type.String() {
-					mappingMerge(out, field.Index, mapping(fieldValue, tag))
-					continue
-				}
-			case reflect.Pointer == field.Type.Kind():
-				if fieldValue.IsNil() {
-					// init
-					value.Field(i).Set(reflect.New(fieldValue.Type().Elem()))
-				}
+	for i := 0; i < value.NumField(); i++ {
+		field := vType.Field(i)
+		fieldValue := value.Field(i)
+		switch {
+		case !field.IsExported():
+			// 不可导出
+			continue
+		case field.Anonymous:
+			// 内嵌
+			mappingMerge(out, field.Index, mapping(fieldValue, tag))
+			continue
+		case reflect.Struct == field.Type.Kind():
+			if "time.Time" != field.Type.String() {
 				mappingMerge(out, field.Index, mapping(fieldValue, tag))
 				continue
 			}
-
-			tagValue := field.Tag.Get(tag)
-			tagValue, _ = head(tagValue, ",")
-			if "-" == tagValue || "" == tagValue {
-				continue
+		case reflect.Pointer == field.Type.Kind():
+			if fieldValue.IsNil() {
+				value.Field(i).Set(reflect.New(fieldValue.Type().Elem()))
 			}
+			mappingMerge(out, field.Index, mapping(fieldValue, tag))
+			continue
+		}
 
-			mappingConflict(out, tagValue, field.Name)
+		tagValue := field.Tag.Get(tag)
+		tagValue, _ = head(tagValue, ",")
+		if "-" == tagValue || "" == tagValue {
+			continue
+		}
 
-			out[tagValue] = structFiledIndex{
-				index: []int{i},
-				field: field,
-			}
+		mappingConflict(out, tagValue, field.Name)
+
+		out[tagValue] = structFiledIndex{
+			index: []int{i},
+			field: field,
 		}
 	}
 
