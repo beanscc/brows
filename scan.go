@@ -186,15 +186,16 @@ func mappingByColumns(columns []string, rv reflect.Value) structFields {
 
 		// fmt.Printf("f:%#v, orv:%#v\n", f, rv)
 		if fv := rv.Field(f.index[0]); reflect.Pointer == fv.Kind() && fv.IsNil() {
-			rv.Field(f.index[0]).Set(reflect.New(fv.Type().Elem()))
+			fv.Set(reflect.New(fv.Type().Elem()))
 		}
 
-		if fv := rv.FieldByIndex(f.index); reflect.Pointer == fv.Kind() && fv.IsNil() {
-			f.value = reflect.New(fv.Type().Elem())
-		} else {
-			f.value = fv
+		fv := rv.FieldByIndex(f.index)
+		if reflect.Pointer == fv.Kind() && fv.IsNil() {
+			fv.Set(reflect.New(fv.Type().Elem()))
 		}
+		f.value = fv
 
+		// fmt.Printf("f:%#v\n", f.value)
 		out = append(out, f)
 	}
 

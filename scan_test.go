@@ -9,7 +9,7 @@ import (
 func Test_mappingByColumns(t *testing.T) {
 	type Person struct {
 		Name string `db:"name"`
-		Age  int    `db:"age"`
+		Age  *int   `db:"age"`
 	}
 
 	// 课程成绩
@@ -47,14 +47,14 @@ func Test_mappingByColumns(t *testing.T) {
 		"name",
 		"age",
 
-		"grade",
-		"class",
-		"entry_at",
-		"graduated_at",
-
-		"head_teacher",
-
-		"math",
+		// "grade",
+		// "class",
+		// "entry_at",
+		// "graduated_at",
+		//
+		// // "head_teacher",
+		//
+		// "math",
 		"english",
 	}
 

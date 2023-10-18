@@ -48,7 +48,7 @@ type TestApp struct {
 	// StartTime int64     `db:"start_time"`
 
 	// 内嵌类型
-	*TestAppTime
+	TestAppTime
 
 	Ctime    time.Time `db:"ctime"`
 	Utime    time.Time `db:"utime"`
@@ -56,8 +56,8 @@ type TestApp struct {
 }
 
 type TestAppTime struct {
-	EndTime   int64 `db:"end_time"`
-	StartTime int64 `db:"start_time"`
+	EndTime   int64  `db:"end_time"`
+	StartTime *int64 `db:"start_time"`
 }
 
 /*
