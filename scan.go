@@ -26,7 +26,7 @@ var (
 //
 //	type User struct {
 //		Name string `db:"name"`
-//		Age uint8 `db:"age"`
+//		Age  uint8  `db:"age"`
 //	}
 //
 //	var user User
@@ -75,7 +75,7 @@ func Scan(rows *sql.Rows, dest any) error {
 //
 //	type User struct {
 //		Name string `db:"name"`
-//		Age uint8 `db:"age"`
+//		Age  uint8  `db:"age"`
 //	}
 //
 //	var users []User // or []*User

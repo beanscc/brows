@@ -1,4 +1,4 @@
-package brows
+package brows_test
 
 import (
 	"database/sql"
@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/beanscc/brows"
 	"github.com/go-sql-driver/mysql"
 )
 
@@ -165,7 +166,7 @@ func TestBrows_QueryRow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := New(testDB(t)).QueryRow(tt.args.query, tt.args.args...).Scan(tt.args.dest)
+			err := brows.New(testDB(t)).QueryRow(tt.args.query, tt.args.args...).Scan(tt.args.dest)
 			if err != nil && !tt.want.hasErr {
 				t.Errorf("QueryRow failed. err: %v", err)
 				return
@@ -258,7 +259,7 @@ func TestBrows_Query(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := New(testDB(t)).Query(tt.args.query, tt.args.args...).Scan(tt.args.dest)
+			err := brows.New(testDB(t)).Query(tt.args.query, tt.args.args...).Scan(tt.args.dest)
 			if err != nil && !tt.want.hasErr {
 				t.Errorf("QueryRow failed. err: %v", err)
 				return

@@ -69,6 +69,14 @@ func Test_mapping(t *testing.T) {
 		T2
 	}
 
+	type T5 struct {
+		ID string `db:"id"`
+		*T2
+		*T1
+		CreatedAt time.Time  `db:"created_at"`
+		DeletedAt *time.Time `db:"deleted_at"`
+	}
+
 	test := []struct {
 		rt   reflect.Type
 		want map[string]structField
@@ -195,7 +203,37 @@ func Test_mapping(t *testing.T) {
 			},
 		},
 
-		// TODO
+		// *T5
+		{
+			rt: reflect.TypeOf(&T5{}),
+			want: map[string]structField{
+				"id": {
+					ignore: false,
+					index:  []int{0},
+					field:  reflect.TypeOf(&T5{}).Elem().Field(0),
+				},
+				"name2": {
+					ignore: false,
+					index:  []int{1, 0},
+					field:  reflect.TypeOf(&T5{}).Elem().FieldByIndex([]int{1, 0}),
+				},
+				"name": {
+					ignore: false,
+					index:  []int{2, 0},
+					field:  reflect.TypeOf(&T5{}).Elem().FieldByIndex([]int{2, 0}),
+				},
+				"created_at": {
+					ignore: false,
+					index:  []int{3},
+					field:  reflect.TypeOf(&T5{}).Elem().FieldByIndex([]int{3}),
+				},
+				"deleted_at": {
+					ignore: false,
+					index:  []int{4},
+					field:  reflect.TypeOf(&T5{}).Elem().FieldByIndex([]int{4}),
+				},
+			},
+		},
 	}
 
 	for _, tt := range test {
@@ -205,9 +243,21 @@ func Test_mapping(t *testing.T) {
 			t.Logf("want:%#v", tt.want)
 
 			for k := range got {
-				if err := fnStructFieldCompare(got[k], tt.want[k]); err != nil {
-					t.Errorf("not matched. err:%v", err)
+				want, ok := tt.want[k]
+				if !ok {
+					t.Errorf("Test_mapping got unexpected tag: %s", k)
+					return
 				}
+				if err := fnStructFieldCompare(got[k], want); err != nil {
+					t.Errorf("Test_mapping tag struct not matched. tag:%s, err:%v", k, err)
+					return
+				}
+
+				delete(tt.want, k)
+			}
+
+			for k := range tt.want {
+				t.Errorf("Test_mapping got miss tag: %s in want", k)
 			}
 		})
 	}
@@ -254,9 +304,9 @@ func Test_mappingByColumns(t *testing.T) {
 		"name",
 		"age",
 
-		// "grade",
-		// "class",
-		// "entry_at",
+		"grade",
+		"class",
+		"entry_at",
 		"graduated_at",
 
 		// "head_teacher",
@@ -267,13 +317,13 @@ func Test_mappingByColumns(t *testing.T) {
 
 	dest := &Student{}
 	t.Logf("before mapping dest:%#v", dest)
-	got := mapping(reflect.TypeOf(dest), "db")
-	i := 0
-	for k, v := range got {
-		t.Logf("mapping column:%16s, idx:%2d, field: %#v", k, i, v)
-		i++
-	}
-	t.Logf("after mapping dest:%#v", dest)
+	// got := mapping(reflect.TypeOf(dest), "db")
+	// i := 0
+	// for k, v := range got {
+	// 	t.Logf("mapping column:%16s, idx:%2d, field: %#v", k, i, v)
+	// 	i++
+	// }
+	// t.Logf("after mapping dest:%#v", dest)
 
 	fs := mappingByColumns(columns, reflect.ValueOf(dest))
 	for i, v := range fs {
