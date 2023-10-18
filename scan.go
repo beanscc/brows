@@ -139,16 +139,25 @@ func mapColumns(columns []string, e reflect.Value) structFields {
 	}
 
 	m := mapping(e, _tagLabel)
+	used := make(map[string]struct{}, len(columns))
 	out := make([]structField, 0, len(columns))
 	for _, v := range columns {
 		f, ok := m[v]
 		if !ok {
 			// 忽略这个字段的 scan
-			out = append(out, structField{value: _ignoreScan})
+			out = append(out, structField{ignore: true})
 			continue
 		}
 
 		out = append(out, f)
+	}
+
+	for k, v := range m {
+		if _, ok := used[k]; !ok {
+			if reflect.Pointer == v.field.Type.Kind() {
+				v.value.SetZero()
+			}
+		}
 	}
 
 	return out
@@ -170,19 +179,25 @@ type structFields []structField
 
 func (fs structFields) values() (out []any) {
 	for _, v := range fs {
-		out = append(out, v.value)
+		if v.ignore {
+			out = append(out, _ignoreScan)
+		} else {
+			out = append(out, v.value.Addr().Interface())
+		}
 	}
 
 	return out
 }
 
 type structField struct {
+	// 是否忽略
+	ignore bool
 	// 字段位于结构体中的索引位置，reflect.Value FieldByIndex 使用
 	index []int
 	// 字段
 	field reflect.StructField
-	// field 指针值
-	value any
+	// field value
+	value reflect.Value
 }
 
 // mapping 提取 value 对象的 tag 和 structField 的映射关系.
@@ -251,7 +266,7 @@ func mapping(value reflect.Value, tag string) map[string]structField {
 		out[tagValue] = structField{
 			index: []int{i},
 			field: field,
-			value: value.Field(i).Addr().Interface(),
+			value: value.Field(i),
 		}
 	}
 

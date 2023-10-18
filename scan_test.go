@@ -25,6 +25,8 @@ func Test_mapColumns(t *testing.T) {
 		Grade int `db:"grade"`
 		// 班级
 		Class int `db:"class"`
+		// 班主任
+		HeadTeacher *string `db:"head_teacher"`
 		// 入学时间
 		EntryAt time.Time `db:"entry_at"`
 		// 毕业时间
