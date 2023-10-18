@@ -58,8 +58,8 @@ func Scan(rows *sql.Rows, dest any) error {
 	}
 
 	// 映射查询字段和结构体字段
-	args := mapColumns(columns, ev)
-	if err := rows.Scan(args...); err != nil {
+	fields := mapColumns(columns, ev)
+	if err := rows.Scan(fields.values()...); err != nil {
 		return err
 	}
 
@@ -115,8 +115,8 @@ func ScanSlice(rows *sql.Rows, dest any) error {
 
 	for rows.Next() {
 		one := reflect.New(sliceElemInnerType)
-		args := mapColumns(columns, one)
-		if err := rows.Scan(args...); err != nil {
+		fields := mapColumns(columns, one)
+		if err := rows.Scan(fields.values()...); err != nil {
 			return err
 		}
 		if reflect.Pointer != sliceElemType.Kind() {
@@ -133,23 +133,22 @@ func ScanSlice(rows *sql.Rows, dest any) error {
 }
 
 // mapColumns 根据 columns 字段名称，在 e 中按 tag 找到对应 structField,
-func mapColumns(columns []string, e reflect.Value) []any {
+func mapColumns(columns []string, e reflect.Value) structFields {
 	if reflect.Pointer == e.Kind() {
 		e = e.Elem()
 	}
 
 	m := mapping(e, _tagLabel)
-	out := make([]any, 0, len(columns))
+	out := make([]structField, 0, len(columns))
 	for _, v := range columns {
 		f, ok := m[v]
 		if !ok {
 			// 忽略这个字段的 scan
-			out = append(out, _ignoreScan)
+			out = append(out, structField{value: _ignoreScan})
 			continue
 		}
 
-		fv := e.FieldByIndex(f.index)
-		out = append(out, fv.Addr().Interface())
+		out = append(out, f)
 	}
 
 	return out
@@ -167,14 +166,28 @@ func (s *ignoreScan) Scan(v any) error {
 // tag 标签
 var _tagLabel = "db"
 
-type structFiledIndex struct {
-	// index 位置
-	// 若是内嵌类型/ 则, index 切片元素依次表示每个层级的索引位置
-	index []int
-	field reflect.StructField
+type structFields []structField
+
+func (fs structFields) values() (out []any) {
+	for _, v := range fs {
+		out = append(out, v.value)
+	}
+
+	return out
 }
 
-// mapping 提取 value 对象的 tag 和 structField 的映射关系
+type structField struct {
+	// 字段位于结构体中的索引位置，reflect.Value FieldByIndex 使用
+	index []int
+	// 字段
+	field reflect.StructField
+	// field 指针值
+	value any
+}
+
+// mapping 提取 value 对象的 tag 和 structField 的映射关系.
+//
+// 注意：若 structField 是指针类型，将被初始化
 //
 // 提取规则
 // - tag 需唯一，value 对象内，若 tag 重复，则 panic
@@ -186,7 +199,7 @@ type structFiledIndex struct {
 //   - 匿名内嵌对象
 //   - 非 time.Time 类型的结构体
 //   - 指针对象
-func mapping(value reflect.Value, tag string) map[string]structFiledIndex {
+func mapping(value reflect.Value, tag string) map[string]structField {
 	vKind := value.Kind()
 	if reflect.Pointer == vKind {
 		if value.IsNil() {
@@ -200,7 +213,7 @@ func mapping(value reflect.Value, tag string) map[string]structFiledIndex {
 		return nil
 	}
 
-	out := make(map[string]structFiledIndex)
+	out := make(map[string]structField)
 	for i := 0; i < value.NumField(); i++ {
 		field := vType.Field(i)
 		fieldValue := value.Field(i)
@@ -221,8 +234,10 @@ func mapping(value reflect.Value, tag string) map[string]structFiledIndex {
 			if fieldValue.IsNil() {
 				value.Field(i).Set(reflect.New(fieldValue.Type().Elem()))
 			}
-			mappingMerge(out, field.Index, mapping(fieldValue, tag))
-			continue
+			if reflect.Struct == field.Type.Elem().Kind() && "time.Time" != field.Type.Elem().String() {
+				mappingMerge(out, field.Index, mapping(fieldValue, tag))
+				continue
+			}
 		}
 
 		tagValue := field.Tag.Get(tag)
@@ -233,9 +248,10 @@ func mapping(value reflect.Value, tag string) map[string]structFiledIndex {
 
 		mappingConflict(out, tagValue, field.Name)
 
-		out[tagValue] = structFiledIndex{
+		out[tagValue] = structField{
 			index: []int{i},
 			field: field,
+			value: value.Field(i).Addr().Interface(),
 		}
 	}
 
@@ -243,19 +259,20 @@ func mapping(value reflect.Value, tag string) map[string]structFiledIndex {
 }
 
 // mappingConflict tag 冲突检查
-func mappingConflict(m map[string]structFiledIndex, tag string, field string) {
+func mappingConflict(m map[string]structField, tag string, field string) {
 	if v, ok := m[tag]; ok {
 		panic(fmt.Sprintf("brows: tag[%s] conflict. field %s vs %s", tag, v.field.Name, field))
 	}
 }
 
 // mappingMerge 合并
-func mappingMerge(dest map[string]structFiledIndex, parentIndex []int, source map[string]structFiledIndex) {
+func mappingMerge(dest map[string]structField, parentIndex []int, source map[string]structField) {
 	for k, v := range source {
 		mappingConflict(dest, k, v.field.Name)
-		dest[k] = structFiledIndex{
+		dest[k] = structField{
 			index: append(parentIndex, v.index...),
 			field: v.field,
+			value: v.value,
 		}
 	}
 }

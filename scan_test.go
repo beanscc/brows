@@ -7,51 +7,60 @@ import (
 )
 
 func Test_mapColumns(t *testing.T) {
-	type testAppStatus int
-
-	type testAppTime struct {
-		EndTime   int64 `db:"end_time"`
-		StartTime int64 `db:"start_time"`
+	type Person struct {
+		Name string `db:"name"`
+		Age  int    `db:"age"`
 	}
 
-	type testApp struct {
-		ID     int64         `db:"id"`
-		Name   string        `db:"name"`
-		AppID  string        `db:"app_id"`
-		Secret string        `db:"secret"`
-		Sign   string        `db:"sign"`
-		Status testAppStatus `db:"status"`
-		// EndTime   int64     `db:"end_time"`
-		// StartTime int64     `db:"start_time"`
+	// 课程成绩
+	type CourseScore struct {
+		Math    float64 `db:"math"`
+		English float64 `db:"english"`
+	}
 
-		// 内嵌类型
-		*testAppTime
+	type Student struct {
+		// 学号
+		ID string `db:"id"`
+		// 年级
+		Grade int `db:"grade"`
+		// 班级
+		Class int `db:"class"`
+		// 入学时间
+		EntryAt time.Time `db:"entry_at"`
+		// 毕业时间
+		GraduatedAt *time.Time `db:"graduated_at"`
 
-		Ctime    time.Time `db:"ctime"`
-		Utime    time.Time `db:"utime"`
-		Operator string    `db:"operator"`
+		// 内嵌 struct
+		// 个人信息
+		Person
+
+		// 内嵌 *struct
+		// 课程成绩, 考试时候才有
+		*CourseScore
 	}
 
 	columns := []string{
 		"id",
+
 		"name",
-		"app_id",
-		"secret",
-		"sign",
-		"status",
-		"start_time",
-		"end_time",
-		"ctime",
-		"utime",
-		"operator",
+		"age",
+
+		"grade",
+		"class",
+		"entry_at",
+		"graduated_at",
+
+		"math",
+		"english",
 	}
 
-	dest := &testApp{}
+	dest := &Student{}
+	t.Logf("before mapping dest:%#v", dest)
 	e := reflect.ValueOf(dest)
 	got := mapColumns(columns, e)
-	i := 0
-	for k, v := range got {
-		t.Logf("Test_mapColumns idx:%2d, k:%v, field:%#v", i, k, v)
-		i++
+	for i, v := range got {
+		t.Logf("Test_mapColumns column:%16s, idx:%2d, field: %#v", columns[i], i, v)
 	}
+
+	t.Logf("after mapping dest:%#v", dest)
 }
