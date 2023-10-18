@@ -184,7 +184,6 @@ func mappingByColumns(columns []string, rv reflect.Value) structFields {
 			continue
 		}
 
-		// fmt.Printf("f:%#v, orv:%#v\n", f, rv)
 		if fv := rv.Field(f.index[0]); reflect.Pointer == fv.Kind() && fv.IsNil() {
 			fv.Set(reflect.New(fv.Type().Elem()))
 		}
@@ -195,7 +194,6 @@ func mappingByColumns(columns []string, rv reflect.Value) structFields {
 		}
 		f.value = fv
 
-		// fmt.Printf("f:%#v\n", f.value)
 		out = append(out, f)
 	}
 
