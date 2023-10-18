@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func Test_mapColumns(t *testing.T) {
+func Test_mappingByColumns(t *testing.T) {
 	type Person struct {
 		Name string `db:"name"`
 		Age  int    `db:"age"`
@@ -52,17 +52,25 @@ func Test_mapColumns(t *testing.T) {
 		"entry_at",
 		"graduated_at",
 
+		"head_teacher",
+
 		"math",
 		"english",
 	}
 
 	dest := &Student{}
 	t.Logf("before mapping dest:%#v", dest)
-	e := reflect.ValueOf(dest)
-	got := mapColumns(columns, e)
-	for i, v := range got {
-		t.Logf("Test_mapColumns column:%16s, idx:%2d, field: %#v", columns[i], i, v)
+	got := mapping(reflect.TypeOf(dest), "db")
+	i := 0
+	for k, v := range got {
+		t.Logf("mapping column:%16s, idx:%2d, field: %#v", k, i, v)
+		i++
 	}
+	t.Logf("after mapping dest:%#v", dest)
 
+	fs := mappingByColumns(columns, reflect.ValueOf(dest))
+	for i, v := range fs {
+		t.Logf("mappingByColumns column:%16s, idx:%2d, field: %#v", columns[i], i, v)
+	}
 	t.Logf("after mapping dest:%#v", dest)
 }

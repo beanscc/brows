@@ -58,7 +58,7 @@ func Scan(rows *sql.Rows, dest any) error {
 	}
 
 	// 映射查询字段和结构体字段
-	fields := mapColumns(columns, ev)
+	fields := mappingByColumns(columns, ev)
 	if err := rows.Scan(fields.values()...); err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func ScanSlice(rows *sql.Rows, dest any) error {
 
 	for rows.Next() {
 		one := reflect.New(sliceElemInnerType)
-		fields := mapColumns(columns, one)
+		fields := mappingByColumns(columns, one)
 		if err := rows.Scan(fields.values()...); err != nil {
 			return err
 		}
@@ -130,37 +130,6 @@ func ScanSlice(rows *sql.Rows, dest any) error {
 
 	rv.Elem().Set(slice)
 	return rows.Close()
-}
-
-// mapColumns 根据 columns 字段名称，在 e 中按 tag 找到对应 structField,
-func mapColumns(columns []string, e reflect.Value) structFields {
-	if reflect.Pointer == e.Kind() {
-		e = e.Elem()
-	}
-
-	m := mapping(e, _tagLabel)
-	used := make(map[string]struct{}, len(columns))
-	out := make([]structField, 0, len(columns))
-	for _, v := range columns {
-		f, ok := m[v]
-		if !ok {
-			// 忽略这个字段的 scan
-			out = append(out, structField{ignore: true})
-			continue
-		}
-
-		out = append(out, f)
-	}
-
-	for k, v := range m {
-		if _, ok := used[k]; !ok {
-			if reflect.Pointer == v.field.Type.Kind() {
-				v.value.SetZero()
-			}
-		}
-	}
-
-	return out
 }
 
 // _ignoreScan 忽略 scan
@@ -200,9 +169,39 @@ type structField struct {
 	value reflect.Value
 }
 
-// mapping 提取 value 对象的 tag 和 structField 的映射关系.
-//
-// 注意：若 structField 是指针类型，将被初始化
+func mappingByColumns(columns []string, rv reflect.Value) structFields {
+	if reflect.Pointer == rv.Kind() {
+		rv = rv.Elem()
+	}
+
+	m := mapping(rv.Type(), _tagLabel)
+	out := make([]structField, 0, len(columns))
+	for _, v := range columns {
+		f, ok := m[v]
+		if !ok {
+			// 忽略这个字段的 scan
+			out = append(out, structField{ignore: true})
+			continue
+		}
+
+		// fmt.Printf("f:%#v, orv:%#v\n", f, rv)
+		if fv := rv.Field(f.index[0]); reflect.Pointer == fv.Kind() && fv.IsNil() {
+			rv.Field(f.index[0]).Set(reflect.New(fv.Type().Elem()))
+		}
+
+		if fv := rv.FieldByIndex(f.index); reflect.Pointer == fv.Kind() && fv.IsNil() {
+			f.value = reflect.New(fv.Type().Elem())
+		} else {
+			f.value = fv
+		}
+
+		out = append(out, f)
+	}
+
+	return out
+}
+
+// mapping 提取 reflect.Type 对象的 tag 和 structField 的映射关系.
 //
 // 提取规则
 // - tag 需唯一，value 对象内，若 tag 重复，则 panic
@@ -214,43 +213,35 @@ type structField struct {
 //   - 匿名内嵌对象
 //   - 非 time.Time 类型的结构体
 //   - 指针对象
-func mapping(value reflect.Value, tag string) map[string]structField {
-	vKind := value.Kind()
-	if reflect.Pointer == vKind {
-		if value.IsNil() {
-			value.Set(reflect.New(value.Type().Elem()))
-		}
-		return mapping(value.Elem(), tag)
+func mapping(rt reflect.Type, tag string) map[string]structField {
+	kind := rt.Kind()
+	if reflect.Pointer == kind {
+		return mapping(rt.Elem(), tag)
 	}
 
-	vType := value.Type()
-	if reflect.Struct != vKind {
+	if reflect.Struct != kind {
 		return nil
 	}
 
 	out := make(map[string]structField)
-	for i := 0; i < value.NumField(); i++ {
-		field := vType.Field(i)
-		fieldValue := value.Field(i)
+	for i := 0; i < rt.NumField(); i++ {
+		field := rt.Field(i)
 		switch {
 		case !field.IsExported():
 			// 不可导出
 			continue
 		case field.Anonymous:
 			// 内嵌
-			mappingMerge(out, field.Index, mapping(fieldValue, tag))
+			mappingMerge(out, field.Index, mapping(field.Type, tag))
 			continue
 		case reflect.Struct == field.Type.Kind():
 			if "time.Time" != field.Type.String() {
-				mappingMerge(out, field.Index, mapping(fieldValue, tag))
+				mappingMerge(out, field.Index, mapping(field.Type, tag))
 				continue
 			}
 		case reflect.Pointer == field.Type.Kind():
-			if fieldValue.IsNil() {
-				value.Field(i).Set(reflect.New(fieldValue.Type().Elem()))
-			}
 			if reflect.Struct == field.Type.Elem().Kind() && "time.Time" != field.Type.Elem().String() {
-				mappingMerge(out, field.Index, mapping(fieldValue, tag))
+				mappingMerge(out, field.Index, mapping(field.Type, tag))
 				continue
 			}
 		}
@@ -266,7 +257,6 @@ func mapping(value reflect.Value, tag string) map[string]structField {
 		out[tagValue] = structField{
 			index: []int{i},
 			field: field,
-			value: value.Field(i),
 		}
 	}
 

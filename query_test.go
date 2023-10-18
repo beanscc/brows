@@ -87,21 +87,10 @@ COMMENT = '应用APP';
 
 -- 添加测试数据
 
-INSERT INTO `test`.`app`
-(
-`name`,
-`app_id`,
-`secret`,
-`sign`,
-`start_time`,
-`end_time`,
-`status`,
-`description`,
-`operator`)
-VALUES
-('t1', "app_id_1_dfsdfsdfsdfsddf", "secret_1_sfsdfsdfsdfsd", "sign_1_dsfsdfvsdghadfg", 14811110152, 1523772288, 0, "app_id_1_desc", "yx"),
-('t2', "app_id_2_dfsdfsdfsdfsddf", "secret_2_sfsdfsdfsdfsd", "sign_2_dsfsdfvsdghadfg", 1482220152, 1523772288, 1, "app_id_2_desc", "yx"),
-('t3', "app_id_3_dfsdfsdfsdfsddf", "secret_3_sfsdfsdfsdfsd", "sign_4_dsfsdfvsdghadfg", 1483330152, 1523772288, 0, "app_id_3_desc", "yx");
+INSERT INTO `test`.`app` (`name`,`app_id`,`secret`,`sign`,`start_time`,`end_time`,`status`,`description`,`operator`,`ctime`,`utime`) VALUES
+('t1', "app_id_1_dfsdfsdfsdfsddf", "secret_1_sfsdfsdfsdfsd", "sign_1_dsfsdfvsdghadfg", 14811110152, 1523772288, 0, "app_id_1_desc", "yx1", '2022-10-01 01:01:01', '2022-10-11 11:11:11'),
+('t2', "app_id_2_dfsdfsdfsdfsddf", "secret_2_sfsdfsdfsdfsd", "sign_2_dsfsdfvsdghadfg", 14811110152, 1523872288, 1, "app_id_2_desc", "yx2", '2022-10-02 02:02:02', '2022-10-22 02:02:02'),
+('t3', "app_id_3_dfsdfsdfsdfsddf", "secret_3_sfsdfsdfsdfsd", "sign_4_dsfsdfvsdghadfg", 14811110152, 1523972288, 0, "app_id_3_desc", "yx3", '2022-10-03 03:03:03', '2022-10-23 02:02:02');
 */
 
 func TestBrows_QueryRow(t *testing.T) {
