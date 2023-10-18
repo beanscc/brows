@@ -45,6 +45,18 @@ type Row struct {
 	rows *sql.Rows
 }
 
+func (r *Row) Close() error {
+	return r.rows.Close()
+}
+
+func (r *Row) ColumnTypes() ([]*sql.ColumnType, error) {
+	return r.rows.ColumnTypes()
+}
+
+func (r *Row) Columns() ([]string, error) {
+	return r.rows.Columns()
+}
+
 func (r *Row) Err() error {
 	return r.err
 }
@@ -59,6 +71,18 @@ func (r *Row) Scan(dest any) error {
 type Rows struct {
 	err  error
 	rows *sql.Rows
+}
+
+func (rs *Rows) Close() error {
+	return rs.rows.Close()
+}
+
+func (rs *Rows) ColumnTypes() ([]*sql.ColumnType, error) {
+	return rs.rows.ColumnTypes()
+}
+
+func (rs *Rows) Columns() ([]string, error) {
+	return rs.rows.Columns()
 }
 
 func (rs *Rows) Err() error {
