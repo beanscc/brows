@@ -8,9 +8,11 @@ import (
 	"strings"
 )
 
+// sql: Scan error on column index 0, name "cid": destination not a pointer
 var (
-	errScanPtr      = errors.New("brows: value must be non-nil pointer to a struct")
-	errScanPtrSlice = errors.New("brows: value must be non-nil pointer to a slice")
+	ErrScanDestination      = errors.New("brows: Scan destination must be a non-nil pointer to a struct")
+	ErrScanSliceDestination = errors.New("brows: ScanSlice destination must be a non-nil pointer to a slice")
+	ErrSliceElement         = errors.New("brows: slice element only support *struct or struct")
 )
 
 // Scan 读取第一行记录，复制到 dest. dest 必须是 *struct.
@@ -42,12 +44,12 @@ func Scan(rows *sql.Rows, dest any) error {
 
 	rv := reflect.ValueOf(dest)
 	if reflect.Pointer != rv.Kind() || rv.IsNil() {
-		return errScanPtr
+		return ErrScanDestination
 	}
 
 	ev := rv.Elem()
 	if reflect.Struct != ev.Kind() {
-		return errScanPtr
+		return ErrScanDestination
 	}
 
 	columns, err := rows.Columns()
@@ -84,13 +86,13 @@ func ScanSlice(rows *sql.Rows, dest any) error {
 
 	rv := reflect.ValueOf(dest)
 	if reflect.Pointer != rv.Kind() || rv.IsNil() {
-		return errScanPtr
+		return ErrScanSliceDestination
 	}
 
 	// must slice
 	slice := rv.Elem()
 	if reflect.Slice != slice.Kind() {
-		return errScanPtrSlice
+		return ErrScanSliceDestination
 	}
 
 	sliceElemType := slice.Type().Elem() // slice element
@@ -99,11 +101,11 @@ func ScanSlice(rows *sql.Rows, dest any) error {
 	case reflect.Pointer:
 		sliceElemInnerType = sliceElemInnerType.Elem()
 		if reflect.Struct != sliceElemInnerType.Kind() {
-			return errScanPtrSlice
+			return ErrSliceElement
 		}
 	case reflect.Struct:
 	default:
-		return errScanPtrSlice
+		return ErrSliceElement
 	}
 
 	columns, err := rows.Columns()
@@ -176,11 +178,11 @@ type structFiledIndex struct {
 //
 // 提取规则
 // - tag 需唯一，value 对象内，若 tag 重复，则 panic
-// - structField 是以下情况的，将被忽略
+// - structField 以下情况的，将被忽略
 //   - 不可导
 //   - tag 是 '-' 或 空
 //
-// - structField 是以下情况的，将遍历 field 对象的内部字段
+// - structField 以下情况的，将遍历 field 对象的内部字段
 //   - 匿名内嵌对象
 //   - 非 time.Time 类型的结构体
 //   - 指针对象
