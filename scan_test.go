@@ -1,10 +1,217 @@
 package brows
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 	"time"
 )
+
+func Test_mapping(t *testing.T) {
+	// 比较 f1,f2 是否一致，这里不需要指针地址完全一致
+	fnStructFieldCompare := func(f1, f2 structField) error {
+		if f1.ignore != f2.ignore {
+			return errors.New("field: ignore")
+		}
+
+		if !reflect.DeepEqual(f1.index, f2.index) {
+			return errors.New("field: index")
+		}
+
+		if f1.field.Name != f2.field.Name {
+			return errors.New("field: field.Name")
+		}
+
+		if f1.field.PkgPath != f2.field.PkgPath {
+			return errors.New("field: field.PkgPath")
+		}
+
+		if !reflect.DeepEqual(f1.field.Type, f2.field.Type) {
+			return errors.New("field: field.Type")
+		}
+
+		if f1.field.Tag != f2.field.Tag {
+			return errors.New("field: field.Tag")
+		}
+
+		if f1.field.Offset != f2.field.Offset {
+			return errors.New("field: field.Offset")
+		}
+
+		if !reflect.DeepEqual(f1.field.Index, f2.field.Index) {
+			return errors.New("field: field.Index")
+		}
+
+		if f1.field.Anonymous != f2.field.Anonymous {
+			return errors.New("field: field.Anonymous")
+		}
+
+		return nil
+	}
+
+	type T1 struct {
+		Name string `db:"name"`
+	}
+
+	type T2 struct {
+		Name2 *string `db:"name2"`
+	}
+
+	// 内嵌
+	type T3 struct {
+		ID string `db:"id"`
+		T1
+	}
+
+	type T4 struct {
+		ID string `db:"id"`
+		*T1
+		T2
+	}
+
+	test := []struct {
+		rt   reflect.Type
+		want map[string]structField
+	}{
+		// T1
+		{
+			rt: reflect.TypeOf(T1{}),
+			want: map[string]structField{
+				"name": {
+					ignore: false,
+					index:  []int{0},
+					field:  reflect.TypeOf(T1{}).Field(0),
+				},
+			},
+		},
+		// *T1
+		{
+			rt: reflect.TypeOf(&T1{}),
+			want: map[string]structField{
+				"name": {
+					ignore: false,
+					index:  []int{0},
+					field:  reflect.TypeOf(&T1{}).Elem().Field(0),
+				},
+			},
+		},
+
+		// field string
+		// T2
+		{
+			rt: reflect.TypeOf(T2{}),
+			want: map[string]structField{
+				"name2": {
+					ignore: false,
+					index:  []int{0},
+					field:  reflect.TypeOf(T2{}).Field(0),
+				},
+			},
+		},
+		// *T2
+		{
+			rt: reflect.TypeOf(&T2{}),
+			want: map[string]structField{
+				"name2": {
+					ignore: false,
+					index:  []int{0},
+					field:  reflect.TypeOf(&T2{}).Elem().Field(0),
+				},
+			},
+		},
+		// T3
+		{
+			rt: reflect.TypeOf(T3{}),
+			want: map[string]structField{
+				"id": {
+					ignore: false,
+					index:  []int{0},
+					field:  reflect.TypeOf(T3{}).Field(0),
+				},
+				"name": {
+					ignore: false,
+					index:  []int{1, 0},
+					field:  reflect.TypeOf(T3{}).FieldByIndex([]int{1, 0}),
+				},
+			},
+		},
+		// *T3
+		{
+			rt: reflect.TypeOf(&T3{}),
+			want: map[string]structField{
+				"id": {
+					ignore: false,
+					index:  []int{0},
+					field:  reflect.TypeOf(&T3{}).Elem().Field(0),
+				},
+				"name": {
+					ignore: false,
+					index:  []int{1, 0},
+					field:  reflect.TypeOf(&T3{}).Elem().FieldByIndex([]int{1, 0}),
+				},
+			},
+		},
+
+		// T4
+		{
+			rt: reflect.TypeOf(T4{}),
+			want: map[string]structField{
+				"id": {
+					ignore: false,
+					index:  []int{0},
+					field:  reflect.TypeOf(T4{}).Field(0),
+				},
+				"name2": {
+					ignore: false,
+					index:  []int{2, 0},
+					field:  reflect.TypeOf(T4{}).FieldByIndex([]int{2, 0}),
+				},
+				"name": {
+					ignore: false,
+					index:  []int{1, 0},
+					field:  reflect.TypeOf(T4{}).FieldByIndex([]int{1, 0}),
+				},
+			},
+		},
+		// *T4
+		{
+			rt: reflect.TypeOf(&T4{}),
+			want: map[string]structField{
+				"id": {
+					ignore: false,
+					index:  []int{0},
+					field:  reflect.TypeOf(&T4{}).Elem().Field(0),
+				},
+				"name2": {
+					ignore: false,
+					index:  []int{2, 0},
+					field:  reflect.TypeOf(&T4{}).Elem().FieldByIndex([]int{2, 0}),
+				},
+				"name": {
+					ignore: false,
+					index:  []int{1, 0},
+					field:  reflect.TypeOf(&T4{}).Elem().FieldByIndex([]int{1, 0}),
+				},
+			},
+		},
+
+		// TODO
+	}
+
+	for _, tt := range test {
+		t.Run("", func(t *testing.T) {
+			got := mapping(tt.rt, "db")
+			t.Logf(" got:%#v", got)
+			t.Logf("want:%#v", tt.want)
+
+			for k := range got {
+				if err := fnStructFieldCompare(got[k], tt.want[k]); err != nil {
+					t.Errorf("not matched. err:%v", err)
+				}
+			}
+		})
+	}
+}
 
 func Test_mappingByColumns(t *testing.T) {
 	type Person struct {
@@ -50,11 +257,11 @@ func Test_mappingByColumns(t *testing.T) {
 		// "grade",
 		// "class",
 		// "entry_at",
-		// "graduated_at",
-		//
-		// // "head_teacher",
-		//
-		// "math",
+		"graduated_at",
+
+		// "head_teacher",
+
+		"math",
 		"english",
 	}
 

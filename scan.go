@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-// sql: Scan error on column index 0, name "cid": destination not a pointer
 var (
 	ErrScanDestination      = errors.New("brows: Scan destination must be a non-nil pointer to a struct")
 	ErrScanSliceDestination = errors.New("brows: ScanSlice destination must be a non-nil pointer to a slice")
