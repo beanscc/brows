@@ -27,8 +27,7 @@ func (b *Brows) QueryRow(query string, args ...any) *Row {
 }
 
 func (b *Brows) QueryRowContext(ctx context.Context, query string, args ...any) *Row {
-	rows, err := b.query.QueryContext(ctx, query, args...)
-	return &Row{err: err, rows: rows}
+	return &Row{rows: b.QueryContext(ctx, query, args...)}
 }
 
 func (b *Brows) Query(query string, args ...any) *Rows {
@@ -41,31 +40,19 @@ func (b *Brows) QueryContext(ctx context.Context, query string, args ...any) *Ro
 }
 
 type Row struct {
-	err  error
-	rows *sql.Rows
-}
-
-func (r *Row) Close() error {
-	return r.rows.Close()
-}
-
-func (r *Row) ColumnTypes() ([]*sql.ColumnType, error) {
-	return r.rows.ColumnTypes()
-}
-
-func (r *Row) Columns() ([]string, error) {
-	return r.rows.Columns()
+	rows *Rows
 }
 
 func (r *Row) Err() error {
-	return r.err
+	return r.rows.err
 }
 
 func (r *Row) Scan(dest any) error {
-	if r.err != nil {
-		return r.err
+	if err := r.rows.err; err != nil {
+		return err
 	}
-	return Scan(r.rows, dest)
+
+	return Scan(r.rows.rows, dest)
 }
 
 type Rows struct {
