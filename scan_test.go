@@ -2,53 +2,15 @@ package brows
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
+	"sort"
+	"strconv"
 	"testing"
 	"time"
 )
 
-func Test_mapping(t *testing.T) {
-	// 比较 f1,f2 是否一致，这里不需要指针地址完全一致
-	fnStructFieldCompare := func(f1, f2 structField) error {
-		if f1.ignore != f2.ignore {
-			return errors.New("field: ignore")
-		}
-
-		if !reflect.DeepEqual(f1.index, f2.index) {
-			return errors.New("field: index")
-		}
-
-		if f1.field.Name != f2.field.Name {
-			return errors.New("field: field.Name")
-		}
-
-		if f1.field.PkgPath != f2.field.PkgPath {
-			return errors.New("field: field.PkgPath")
-		}
-
-		if !reflect.DeepEqual(f1.field.Type, f2.field.Type) {
-			return errors.New("field: field.Type")
-		}
-
-		if f1.field.Tag != f2.field.Tag {
-			return errors.New("field: field.Tag")
-		}
-
-		if f1.field.Offset != f2.field.Offset {
-			return errors.New("field: field.Offset")
-		}
-
-		if !reflect.DeepEqual(f1.field.Index, f2.field.Index) {
-			return errors.New("field: field.Index")
-		}
-
-		if f1.field.Anonymous != f2.field.Anonymous {
-			return errors.New("field: field.Anonymous")
-		}
-
-		return nil
-	}
-
+func TestMapping(t *testing.T) {
 	type Inner1 struct {
 		F1 string  `db:"inner1.f1"`
 		F2 *string `db:"inner1.f2"`
@@ -104,7 +66,6 @@ func Test_mapping(t *testing.T) {
 				"inner1.f2": {
 					index: []int{7, 1},
 				},
-
 				"inner2.f1": {
 					index: []int{8, 0},
 				},
@@ -119,18 +80,39 @@ func Test_mapping(t *testing.T) {
 		t.Run("", func(t *testing.T) {
 			got := mapping(tt.rt, "db")
 
-			for k, v := range got {
-				want, ok := tt.want[k]
-				t.Logf("Test_mapping  got[%s]:%#v", k, v)
-				want.field = tt.rt.FieldByIndex(want.index)
-				t.Logf("Test_mapping want[%s]:%#v", k, want)
+			type orderedGot struct {
+				key   string
+				tag   string
+				field structField
+			}
 
+			_orderedGot := make([]orderedGot, 0, len(got))
+			for k, v := range got {
+				key := ""
+				for _, v2 := range v.index {
+					key += strconv.Itoa(v2)
+				}
+				_orderedGot = append(_orderedGot, orderedGot{
+					key:   key,
+					tag:   k,
+					field: v,
+				})
+			}
+
+			sort.Slice(_orderedGot, func(i, j int) bool {
+				return _orderedGot[i].key < _orderedGot[j].key
+			})
+
+			for _, v := range _orderedGot {
+				k := v.tag
+				want, ok := tt.want[k]
 				if !ok {
 					t.Errorf("Test_mapping got unexpected tag: %s", k)
 					continue
 				}
-				if err := fnStructFieldCompare(got[k], want); err != nil {
-					t.Errorf("Test_mapping tag struct not matched. tag:%s, err:%v", k, err)
+
+				if !reflect.DeepEqual(v.field.index, want.index) {
+					t.Errorf("Test_mapping field index not matched. tag:%s", k)
 					continue
 				}
 
@@ -143,6 +125,130 @@ func Test_mapping(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMappingByColumns(t *testing.T) {
+	fnCompare := func(s1, s2 structFields) error {
+		if len(s1) != len(s2) {
+			return errors.New("length not equal")
+		}
+
+		s1m := make(map[string]structField)
+		for _, v := range s1 {
+			s1m[v.column] = v
+		}
+		if len(s1) != len(s1m) {
+			return errors.New("s1 mapping tag error")
+		}
+
+		s2m := make(map[string]structField)
+		for _, v := range s2 {
+			s2m[v.column] = v
+		}
+		if len(s2) != len(s2m) {
+			return errors.New("s2 mapping tag error")
+		}
+
+		for k, v1 := range s1m {
+			v2, ok := s2m[k]
+			if !ok {
+				return errors.New(fmt.Sprintf("key:%s, in s1 not in s2", k))
+			}
+			if v1.ignore != v2.ignore {
+				return errors.New(fmt.Sprintf("key:%s, v1.ignore != v2.ignore", k))
+			}
+
+			if v1.column != v2.column {
+				return errors.New(fmt.Sprintf("key:%s, v1.column != v2.column", k))
+			}
+
+			if !reflect.DeepEqual(v1.index, v2.index) {
+				return errors.New(fmt.Sprintf("key:%s, !reflect.DeepEqual(v1.index, v2.index)", k))
+			}
+
+			// value
+			// if v1.value.Kind() != v2.value.Kind() {
+			// 	return errors.New(fmt.Sprintf("key:%s, v1.value.Kind() != v2.value.Kind(). v1 kind:%s, v2 kind:%s", k,
+			// 		v1.value.Kind(), v2.value.Kind()))
+			// }
+
+			if v1.value.Type() != v2.value.Type() {
+				return errors.New(fmt.Sprintf("key:%s, v1.value.Type() != v2.value.Type(). v1 type:%s, v2 type:%s", k,
+					v1.value.Type(), v2.value.Type()))
+			}
+
+			if reflect.Pointer == v1.value.Kind() {
+				isV1Nil := v1.value.IsNil()
+				isV2Nil := v2.value.IsNil()
+				if isV1Nil && !isV2Nil {
+					return errors.New(fmt.Sprintf("key:%s, v1.value.IsNil() && !v2.value.IsNil()", k))
+				}
+
+				if !isV1Nil && isV2Nil {
+					return errors.New(fmt.Sprintf("key:%s, !v1.value.IsNil() && v2.value.IsNil()", k))
+				}
+			}
+		}
+
+		return nil
+	}
+
+	test := []struct {
+		name    string
+		columns []string
+		ptr     any
+		want    structFields
+		wantErr bool
+	}{
+
+		{
+			name:    "string",
+			columns: []string{"name1", "name2", "name3", "name4"},
+			ptr: &struct {
+				Name1 string  `db:"name1"`
+				Name2 *string `db:"name2"`
+				Name3 []byte  `db:"name3"`
+				Name4 *[]byte `db:"name4"`
+			}{},
+			want: structFields{
+				{column: "name1", ignore: false, index: []int{0}, value: reflect.ValueOf("")},
+				{column: "name2", ignore: false, index: []int{1}, value: reflect.ValueOf(addPtr(""))},
+				{column: "name3", ignore: false, index: []int{2}, value: reflect.ValueOf([]byte(""))},
+				// {column: "name4", ignore: false, index: []int{3}, value: reflect.ValueOf(addPtr([]byte("")))},
+				{column: "name4", ignore: false, index: []int{3}, value: reflect.ValueOf(addPtr([]byte(nil)))},
+			},
+			wantErr: false,
+		},
+
+		// want err
+		{
+			name:    "string",
+			columns: []string{"name1"},
+			ptr: &struct {
+				Name1 string  `db:"name1"`
+				Name2 *string `db:"name2"`
+			}{},
+			want: structFields{
+				{column: "name1", ignore: false, index: []int{0}, value: reflect.ValueOf("")},
+				{column: "name2", ignore: false, index: []int{1}, value: reflect.ValueOf("")},
+			},
+			// want 和 got 不一致
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range test {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mappingByColumns(tt.columns, reflect.ValueOf(tt.ptr))
+			if err := fnCompare(got, tt.want); err != nil && !tt.wantErr {
+				t.Errorf("TestMappingByColumns failed. err:%v", err)
+			}
+		})
+	}
+}
+
+func addPtr[V string | int | []byte](v V) *V {
+	return &v
 }
 
 func Test_mappingByColumns(t *testing.T) {

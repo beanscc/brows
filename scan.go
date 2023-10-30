@@ -158,12 +158,11 @@ func (fs structFields) values() (out []any) {
 }
 
 type structField struct {
+	column string
 	// 是否忽略
 	ignore bool
 	// 字段位于结构体中的索引位置，reflect.Value FieldByIndex 使用
 	index []int
-	// 字段
-	field reflect.StructField
 	// field value
 	value reflect.Value
 }
@@ -178,8 +177,10 @@ func mappingByColumns(columns []string, rv reflect.Value) structFields {
 	for _, v := range columns {
 		f, ok := m[v]
 		if !ok {
+			f.column = v
+			f.ignore = true
 			// 忽略这个字段的 scan
-			out = append(out, structField{ignore: true})
+			out = append(out, f)
 			continue
 		}
 
@@ -197,7 +198,6 @@ func mappingByColumns(columns []string, rv reflect.Value) structFields {
 		}
 
 		f.value = fv
-
 		out = append(out, f)
 	}
 
@@ -255,11 +255,11 @@ func mapping(rt reflect.Type, tag string) map[string]structField {
 			continue
 		}
 
-		mappingConflict(out, tagValue, field.Name)
+		mappingConflict(out, tagValue)
 
 		out[tagValue] = structField{
-			index: []int{i},
-			field: field,
+			column: tagValue,
+			index:  []int{i},
 		}
 	}
 
@@ -267,21 +267,18 @@ func mapping(rt reflect.Type, tag string) map[string]structField {
 }
 
 // mappingConflict tag 冲突检查
-func mappingConflict(m map[string]structField, tag string, field string) {
-	if v, ok := m[tag]; ok {
-		panic(fmt.Sprintf("brows: tag[%s] conflict. field %s vs %s", tag, v.field.Name, field))
+func mappingConflict(m map[string]structField, tag string) {
+	if _, ok := m[tag]; ok {
+		panic(fmt.Sprintf("brows: tag[%s] conflict", tag))
 	}
 }
 
 // mappingMerge 合并
 func mappingMerge(dest map[string]structField, parentIndex []int, source map[string]structField) {
 	for k, v := range source {
-		mappingConflict(dest, k, v.field.Name)
-		dest[k] = structField{
-			index: append(parentIndex, v.index...),
-			field: v.field,
-			value: v.value,
-		}
+		mappingConflict(dest, k)
+		v.index = append(parentIndex, v.index...)
+		dest[k] = v
 	}
 }
 
