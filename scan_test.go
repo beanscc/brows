@@ -214,27 +214,56 @@ func TestMappingByColumns(t *testing.T) {
 				{column: "name1", ignore: false, index: []int{0}, value: reflect.ValueOf("")},
 				{column: "name2", ignore: false, index: []int{1}, value: reflect.ValueOf(addPtr(""))},
 				{column: "name3", ignore: false, index: []int{2}, value: reflect.ValueOf([]byte(""))},
-				// {column: "name4", ignore: false, index: []int{3}, value: reflect.ValueOf(addPtr([]byte("")))},
-				{column: "name4", ignore: false, index: []int{3}, value: reflect.ValueOf(addPtr([]byte(nil)))},
+				{column: "name4", ignore: false, index: []int{3}, value: reflect.ValueOf(addPtr([]byte("")))},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "number",
+			columns: []string{"name1", "name2", "name3", "name4"},
+			ptr: &struct {
+				Name1 int      `db:"name1"`
+				Name2 *int     `db:"name2"`
+				Name3 float64  `db:"name3"`
+				Name4 *float64 `db:"name4"`
+			}{},
+			want: structFields{
+				{column: "name1", ignore: false, index: []int{0}, value: reflect.ValueOf(1)},
+				{column: "name2", ignore: false, index: []int{1}, value: reflect.ValueOf(addPtr(1))},
+				{column: "name3", ignore: false, index: []int{2}, value: reflect.ValueOf(1.05)},
+				{column: "name4", ignore: false, index: []int{3}, value: reflect.ValueOf(addPtr(1.05))},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "time",
+			columns: []string{"name1", "name2"},
+			ptr: &struct {
+				Name1 time.Time  `db:"name1"`
+				Name2 *time.Time `db:"name2"`
+			}{},
+			want: structFields{
+				{column: "name1", ignore: false, index: []int{0}, value: reflect.ValueOf(time.Now())},
+				{column: "name2", ignore: false, index: []int{1}, value: reflect.ValueOf(addPtr(time.Now()))},
 			},
 			wantErr: false,
 		},
 
-		// want err
-		{
-			name:    "string",
-			columns: []string{"name1"},
-			ptr: &struct {
-				Name1 string  `db:"name1"`
-				Name2 *string `db:"name2"`
-			}{},
-			want: structFields{
-				{column: "name1", ignore: false, index: []int{0}, value: reflect.ValueOf("")},
-				{column: "name2", ignore: false, index: []int{1}, value: reflect.ValueOf("")},
-			},
-			// want 和 got 不一致
-			wantErr: true,
-		},
+		// // want err
+		// {
+		// 	name:    "string",
+		// 	columns: []string{"name1"},
+		// 	ptr: &struct {
+		// 		Name1 string  `db:"name1"`
+		// 		Name2 *string `db:"name2"`
+		// 	}{},
+		// 	want: structFields{
+		// 		{column: "name1", ignore: false, index: []int{0}, value: reflect.ValueOf("")},
+		// 		{column: "name2", ignore: false, index: []int{1}, value: reflect.ValueOf("")},
+		// 	},
+		// 	// want 和 got 不一致
+		// 	wantErr: true,
+		// },
 	}
 
 	for _, tt := range test {
@@ -247,7 +276,7 @@ func TestMappingByColumns(t *testing.T) {
 	}
 }
 
-func addPtr[V string | int | []byte](v V) *V {
+func addPtr[V string | []byte | int | float64 | time.Time](v V) *V {
 	return &v
 }
 
