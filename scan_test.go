@@ -49,188 +49,67 @@ func Test_mapping(t *testing.T) {
 		return nil
 	}
 
-	type T1 struct {
-		Name string `db:"name"`
+	type Inner1 struct {
+		F1 string  `db:"inner1.f1"`
+		F2 *string `db:"inner1.f2"`
 	}
 
-	type T2 struct {
-		Name2 *string `db:"name2"`
+	type Inner2 struct {
+		F1 int  `db:"inner2.f1"`
+		F2 *int `db:"inner2.f2"`
 	}
 
-	// 内嵌
-	type T3 struct {
-		ID string `db:"id"`
-		T1
-	}
+	type T struct {
+		F1 string  `db:"f1"`
+		F2 *string `db:"f2"`
 
-	type T4 struct {
-		ID string `db:"id"`
-		*T1
-		T2
-	}
+		// ignore by tag
+		F3 int `db:"-"`
+		F4 int
 
-	type T5 struct {
-		ID string `db:"id"`
-		*T2
-		*T1
-		CreatedAt time.Time  `db:"created_at"`
-		DeletedAt *time.Time `db:"deleted_at"`
+		// ignore by IsExported
+		f5 string
+		f6 string `db:"f6"`
+
+		// struct
+		F7 struct {
+			Inner1 string `db:"f7.i1"`
+		}
+
+		Inner1
+
+		*Inner2
 	}
 
 	test := []struct {
 		rt   reflect.Type
 		want map[string]structField
 	}{
-		// T1
+		// T
 		{
-			rt: reflect.TypeOf(T1{}),
+			rt: reflect.TypeOf(T{}),
 			want: map[string]structField{
-				"name": {
-					ignore: false,
-					index:  []int{0},
-					field:  reflect.TypeOf(T1{}).Field(0),
+				"f1": {
+					index: []int{0},
 				},
-			},
-		},
-		// *T1
-		{
-			rt: reflect.TypeOf(&T1{}),
-			want: map[string]structField{
-				"name": {
-					ignore: false,
-					index:  []int{0},
-					field:  reflect.TypeOf(&T1{}).Elem().Field(0),
+				"f2": {
+					index: []int{1},
 				},
-			},
-		},
+				"f7.i1": {
+					index: []int{6, 0},
+				},
+				"inner1.f1": {
+					index: []int{7, 0},
+				},
+				"inner1.f2": {
+					index: []int{7, 1},
+				},
 
-		// field string
-		// T2
-		{
-			rt: reflect.TypeOf(T2{}),
-			want: map[string]structField{
-				"name2": {
-					ignore: false,
-					index:  []int{0},
-					field:  reflect.TypeOf(T2{}).Field(0),
+				"inner2.f1": {
+					index: []int{8, 0},
 				},
-			},
-		},
-		// *T2
-		{
-			rt: reflect.TypeOf(&T2{}),
-			want: map[string]structField{
-				"name2": {
-					ignore: false,
-					index:  []int{0},
-					field:  reflect.TypeOf(&T2{}).Elem().Field(0),
-				},
-			},
-		},
-		// T3
-		{
-			rt: reflect.TypeOf(T3{}),
-			want: map[string]structField{
-				"id": {
-					ignore: false,
-					index:  []int{0},
-					field:  reflect.TypeOf(T3{}).Field(0),
-				},
-				"name": {
-					ignore: false,
-					index:  []int{1, 0},
-					field:  reflect.TypeOf(T3{}).FieldByIndex([]int{1, 0}),
-				},
-			},
-		},
-		// *T3
-		{
-			rt: reflect.TypeOf(&T3{}),
-			want: map[string]structField{
-				"id": {
-					ignore: false,
-					index:  []int{0},
-					field:  reflect.TypeOf(&T3{}).Elem().Field(0),
-				},
-				"name": {
-					ignore: false,
-					index:  []int{1, 0},
-					field:  reflect.TypeOf(&T3{}).Elem().FieldByIndex([]int{1, 0}),
-				},
-			},
-		},
-
-		// T4
-		{
-			rt: reflect.TypeOf(T4{}),
-			want: map[string]structField{
-				"id": {
-					ignore: false,
-					index:  []int{0},
-					field:  reflect.TypeOf(T4{}).Field(0),
-				},
-				"name2": {
-					ignore: false,
-					index:  []int{2, 0},
-					field:  reflect.TypeOf(T4{}).FieldByIndex([]int{2, 0}),
-				},
-				"name": {
-					ignore: false,
-					index:  []int{1, 0},
-					field:  reflect.TypeOf(T4{}).FieldByIndex([]int{1, 0}),
-				},
-			},
-		},
-		// *T4
-		{
-			rt: reflect.TypeOf(&T4{}),
-			want: map[string]structField{
-				"id": {
-					ignore: false,
-					index:  []int{0},
-					field:  reflect.TypeOf(&T4{}).Elem().Field(0),
-				},
-				"name2": {
-					ignore: false,
-					index:  []int{2, 0},
-					field:  reflect.TypeOf(&T4{}).Elem().FieldByIndex([]int{2, 0}),
-				},
-				"name": {
-					ignore: false,
-					index:  []int{1, 0},
-					field:  reflect.TypeOf(&T4{}).Elem().FieldByIndex([]int{1, 0}),
-				},
-			},
-		},
-
-		// *T5
-		{
-			rt: reflect.TypeOf(&T5{}),
-			want: map[string]structField{
-				"id": {
-					ignore: false,
-					index:  []int{0},
-					field:  reflect.TypeOf(&T5{}).Elem().Field(0),
-				},
-				"name2": {
-					ignore: false,
-					index:  []int{1, 0},
-					field:  reflect.TypeOf(&T5{}).Elem().FieldByIndex([]int{1, 0}),
-				},
-				"name": {
-					ignore: false,
-					index:  []int{2, 0},
-					field:  reflect.TypeOf(&T5{}).Elem().FieldByIndex([]int{2, 0}),
-				},
-				"created_at": {
-					ignore: false,
-					index:  []int{3},
-					field:  reflect.TypeOf(&T5{}).Elem().FieldByIndex([]int{3}),
-				},
-				"deleted_at": {
-					ignore: false,
-					index:  []int{4},
-					field:  reflect.TypeOf(&T5{}).Elem().FieldByIndex([]int{4}),
+				"inner2.f2": {
+					index: []int{8, 1},
 				},
 			},
 		},
@@ -239,23 +118,26 @@ func Test_mapping(t *testing.T) {
 	for _, tt := range test {
 		t.Run("", func(t *testing.T) {
 			got := mapping(tt.rt, "db")
-			t.Logf(" got:%#v", got)
-			t.Logf("want:%#v", tt.want)
 
-			for k := range got {
+			for k, v := range got {
 				want, ok := tt.want[k]
+				t.Logf("Test_mapping  got[%s]:%#v", k, v)
+				want.field = tt.rt.FieldByIndex(want.index)
+				t.Logf("Test_mapping want[%s]:%#v", k, want)
+
 				if !ok {
 					t.Errorf("Test_mapping got unexpected tag: %s", k)
-					return
+					continue
 				}
 				if err := fnStructFieldCompare(got[k], want); err != nil {
 					t.Errorf("Test_mapping tag struct not matched. tag:%s, err:%v", k, err)
-					return
+					continue
 				}
 
 				delete(tt.want, k)
 			}
 
+			// want 还有数据
 			for k := range tt.want {
 				t.Errorf("Test_mapping got miss tag: %s in want", k)
 			}

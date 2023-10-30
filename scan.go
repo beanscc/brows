@@ -183,14 +183,19 @@ func mappingByColumns(columns []string, rv reflect.Value) structFields {
 			continue
 		}
 
-		if fv := rv.Field(f.index[0]); reflect.Pointer == fv.Kind() && fv.IsNil() {
-			fv.Set(reflect.New(fv.Type().Elem()))
-		}
-
-		fv := rv.FieldByIndex(f.index)
+		fv := rv.Field(f.index[0])
 		if reflect.Pointer == fv.Kind() && fv.IsNil() {
 			fv.Set(reflect.New(fv.Type().Elem()))
 		}
+
+		if len(f.index) > 1 {
+			// Anonymous 或 结构体对象
+			fv = rv.FieldByIndex(f.index)
+			if reflect.Pointer == fv.Kind() && fv.IsNil() {
+				fv.Set(reflect.New(fv.Type().Elem()))
+			}
+		}
+
 		f.value = fv
 
 		out = append(out, f)
@@ -204,13 +209,13 @@ func mappingByColumns(columns []string, rv reflect.Value) structFields {
 // 提取规则
 // - tag 需唯一，value 对象内，若 tag 重复，则 panic
 // - structField 以下情况的，将被忽略
-//   - 不可导
 //   - tag 是 '-' 或 空
+//   - 不可导
 //
 // - structField 以下情况的，将遍历 field 对象的内部字段
 //   - 匿名内嵌对象
-//   - 非 time.Time 类型的结构体
 //   - 指针对象
+//   - 非 time.Time 类型的结构体
 func mapping(rt reflect.Type, tag string) map[string]structField {
 	kind := rt.Kind()
 	if reflect.Pointer == kind {
